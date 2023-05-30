@@ -1,0 +1,46 @@
+using Amazon.Lambda.APIGatewayEvents;
+using Amazon.Lambda.Core;
+using Domain.Services.Contract;
+using Infrastructure.Factory;
+
+namespace Adapter.Handler;
+
+public class AuthorizerHandler
+{
+    private readonly ITokenService _tokenService;
+
+    public AuthorizerHandler()
+    {
+        _tokenService = ServiceFactory.CreateTokenService();
+    }
+
+    public async Task<APIGatewayCustomAuthorizerResponse> Handler(APIGatewayCustomAuthorizerRequest request, ILambdaContext? lambdaContext)
+    {
+        var token = request.AuthorizationToken;
+
+        var user = await _tokenService.Verify(token);
+        if (user == null)
+            throw new UnauthorizedAccessException("invalid token");
+
+        return new APIGatewayCustomAuthorizerResponse
+        {
+            PrincipalID = user.Id,
+            Context = new APIGatewayCustomAuthorizerContextOutput() {{"userId", user.Id}},
+            PolicyDocument = new APIGatewayCustomAuthorizerPolicy
+            {
+                Statement = new List<APIGatewayCustomAuthorizerPolicy.IAMPolicyStatement>
+                {
+                    new()
+                    {
+                        Effect = "Allow",
+                        Resource = new HashSet<string>
+                        {
+                            request.MethodArn
+                        },
+                        Action = new HashSet<string> {"execute-api:Invoke"}
+                    }
+                }
+            }
+        };
+    }
+}
