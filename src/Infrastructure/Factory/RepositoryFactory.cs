@@ -1,6 +1,5 @@
 using Amazon.DynamoDBv2;
 using Domain.Repositories;
-using Infrastructure.Repositories;
 using Infrastructure.Repositories.DynamoDb;
 
 namespace Infrastructure.Factory;

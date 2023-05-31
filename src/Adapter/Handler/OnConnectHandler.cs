@@ -17,6 +17,11 @@ public class OnConnectHandler
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
 
+    public OnConnectHandler(IUserConnectionRepository userConnectionRepository)
+    {
+        _userConnectionRepository = userConnectionRepository;
+    }
+
     public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest request, ILambdaContext context)
     {
         var userId = request.RequestContext.GetUserId();

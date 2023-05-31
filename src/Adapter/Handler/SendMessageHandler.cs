@@ -23,6 +23,12 @@ public class SendMessageHandler
         _amazonApiGatewayManagementApi = new AmazonApiGatewayManagementApiClient();
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
+    
+    public SendMessageHandler(IAmazonApiGatewayManagementApi amazonApiGatewayManagementApi, IUserConnectionRepository userConnectionRepository)
+    {
+        _amazonApiGatewayManagementApi = amazonApiGatewayManagementApi;
+        _userConnectionRepository = userConnectionRepository;
+    }
 
     public async Task<SQSBatchResponse> Handler(SQSEvent @event, ILambdaContext context)
     {

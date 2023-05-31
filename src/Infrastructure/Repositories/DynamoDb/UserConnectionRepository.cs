@@ -8,7 +8,7 @@ namespace Infrastructure.Repositories.DynamoDb;
 
 public class UserConnectionRepository : IUserConnectionRepository
 {
-    private const string TableName = "WebSocketAdapter";
+    private const string TableName = "web_socket_adapter_table";
     private readonly IAmazonDynamoDB _amazonDynamoDb;
 
     public UserConnectionRepository(IAmazonDynamoDB amazonDynamoDb)
@@ -16,7 +16,7 @@ public class UserConnectionRepository : IUserConnectionRepository
         _amazonDynamoDb = amazonDynamoDb;
     }
 
-    public async Task<List<UserConnection>?> GetAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<List<UserConnection>> GetAsync(string userId, CancellationToken cancellationToken = default)
     {
         var request = new QueryRequest
         {

@@ -3,6 +3,8 @@ using Amazon.Lambda.Core;
 using Domain.Services.Contract;
 using Infrastructure.Factory;
 
+
+[assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
 namespace Adapter.Handler;
 
 public class AuthorizerHandler
@@ -14,6 +16,11 @@ public class AuthorizerHandler
         _tokenService = ServiceFactory.CreateTokenService();
     }
 
+    public AuthorizerHandler(ITokenService tokenService)
+    {
+        _tokenService = tokenService;
+    }
+    
     public async Task<APIGatewayCustomAuthorizerResponse> Handler(APIGatewayCustomAuthorizerRequest request, ILambdaContext? lambdaContext)
     {
         var token = request.AuthorizationToken;

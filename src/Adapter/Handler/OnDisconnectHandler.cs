@@ -17,6 +17,11 @@ public class OnDisconnectHandler
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
 
+    public OnDisconnectHandler(IUserConnectionRepository userConnectionRepository)
+    {
+        _userConnectionRepository = userConnectionRepository;
+    }
+
     public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest request, ILambdaContext context)
     {
         var userId = request.RequestContext.GetUserId();
