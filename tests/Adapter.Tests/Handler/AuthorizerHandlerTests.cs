@@ -71,5 +71,11 @@ namespace Adapter.Tests.Handler
 
             _tokenServiceMock.Verify(t => t.Verify("invalid-token",It.IsAny<CancellationToken>()), Times.Once);
         }
+
+        [Fact]
+        public async Task Should_Valid_Default_Ctor()
+        {
+            var authorizerHandler = new AuthorizerHandler();
+        }
     }
 }

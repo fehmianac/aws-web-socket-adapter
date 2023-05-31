@@ -64,5 +64,11 @@ namespace Adapter.Tests.Handler
             _userConnectionRepositoryMock.Verify(r => r.DeleteAsync(
                 It.Is<UserConnection>(uc => uc.UserId == userId && uc.ConnectionId == connectionId),It.IsAny<CancellationToken>()), Times.Once);
         }
+        
+        [Fact]
+        public async Task Should_Valid_Default_Ctor()
+        {
+            var handler = new OnDisconnectHandler();
+        }
     }
 }

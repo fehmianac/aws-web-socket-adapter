@@ -1,5 +1,4 @@
 using Amazon.Lambda.APIGatewayEvents;
-using Amazon.Runtime.Internal;
 
 namespace Adapter.Extensions;
 

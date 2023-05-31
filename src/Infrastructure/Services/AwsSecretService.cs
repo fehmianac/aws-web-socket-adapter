@@ -1,6 +1,5 @@
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
-using Domain.Services;
 using Domain.Services.Contract;
 
 namespace Infrastructure.Services;

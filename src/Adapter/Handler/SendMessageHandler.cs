@@ -23,7 +23,7 @@ public class SendMessageHandler
         _amazonApiGatewayManagementApi = new AmazonApiGatewayManagementApiClient();
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
-    
+
     public SendMessageHandler(IAmazonApiGatewayManagementApi amazonApiGatewayManagementApi, IUserConnectionRepository userConnectionRepository)
     {
         _amazonApiGatewayManagementApi = amazonApiGatewayManagementApi;
@@ -36,14 +36,14 @@ public class SendMessageHandler
 
         foreach (var message in @event.Records)
         {
-            var messageDomain = JsonSerializer.Deserialize<MessageDomain>(message.Body);
+            var messageDomain = JsonDeserialize(message.Body);
             if (messageDomain == null)
             {
                 continue;
             }
 
             var connectionIds = await _userConnectionRepository.GetAsync(messageDomain.UserId);
-            if (connectionIds == null || !connectionIds.Any())
+            if (!connectionIds.Any())
             {
                 continue;
             }
@@ -79,6 +79,18 @@ public class SendMessageHandler
                     ConnectionId = connectionId
                 });
             }
+        }
+    }
+
+    private static MessageDomain? JsonDeserialize(string body)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<MessageDomain>(body);
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 }

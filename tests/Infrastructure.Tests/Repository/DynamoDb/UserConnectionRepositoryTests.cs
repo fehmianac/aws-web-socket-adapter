@@ -4,7 +4,6 @@ using Amazon.DynamoDBv2.Model;
 using Autofac.Extras.Moq;
 using AutoFixture;
 using Domain.Entities;
-using Domain.Repositories;
 using Infrastructure.Repositories.DynamoDb;
 using Moq;
 using Xunit;
