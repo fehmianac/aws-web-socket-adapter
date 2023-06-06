@@ -143,6 +143,7 @@ public class UserConnectionRepository : IUserConnectionRepository
             var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
             if (!response.Items.Any())
                 break;
+            
             foreach (var item in response.Items)
             {
                 userOnlineStatus.Add(new OnlineStatus
@@ -153,7 +154,7 @@ public class UserConnectionRepository : IUserConnectionRepository
             }
 
             request.ExclusiveStartKey = response.LastEvaluatedKey;
-        } while (true);
+        } while (request.ExclusiveStartKey.Count > 0);
 
         return userOnlineStatus;
     }
