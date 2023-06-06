@@ -1,6 +1,7 @@
 using System.Net;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Amazon.Util;
 using Domain.Entities;
 using Domain.Repositories;
 
@@ -8,7 +9,7 @@ namespace Infrastructure.Repositories.DynamoDb;
 
 public class UserConnectionRepository : IUserConnectionRepository
 {
-    private const string TableName = "web_socket_adapter_table";
+    private string TableName = Environment.GetEnvironmentVariable("TABLE_NAME") ?? "web_socket_adapter_table";
     private readonly IAmazonDynamoDB _amazonDynamoDb;
 
     public UserConnectionRepository(IAmazonDynamoDB amazonDynamoDb)

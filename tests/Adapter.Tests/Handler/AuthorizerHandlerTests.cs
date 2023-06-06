@@ -25,12 +25,12 @@ namespace Adapter.Tests.Handler
             // Arrange
             var request = new APIGatewayCustomAuthorizerRequest
             {
-                AuthorizationToken = "valid-token",
+                QueryStringParameters = new Dictionary<string, string> {{"Authorization", "valid-token"}},
                 MethodArn = "arn:aws:execute-api:region:account-id:api-id/stage/HTTP_METHOD/resource-path"
             };
 
             var user = new UserDomain("user1");
-            _tokenServiceMock.Setup(t => t.Verify("valid-token",It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _tokenServiceMock.Setup(t => t.Verify("valid-token", It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             // Act
             var response = await _authorizerHandler.Handler(request, new Mock<ILambdaContext>().Object);
@@ -51,7 +51,7 @@ namespace Adapter.Tests.Handler
             Assert.NotNull(statement.Action);
             Assert.Single(statement.Action);
 
-            _tokenServiceMock.Verify(t => t.Verify("valid-token",It.IsAny<CancellationToken>()), Times.Once);
+            _tokenServiceMock.Verify(t => t.Verify("valid-token", It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -60,16 +60,16 @@ namespace Adapter.Tests.Handler
             // Arrange
             var request = new APIGatewayCustomAuthorizerRequest
             {
-                AuthorizationToken = "invalid-token",
-                MethodArn = "arn:aws:execute-api:region:account-id:api-id/stage/HTTP_METHOD/resource-path"
+                MethodArn = "arn:aws:execute-api:region:account-id:api-id/stage/HTTP_METHOD/resource-path",
+                QueryStringParameters = new Dictionary<string, string> {{"Authorization", "invalid-token"}}
             };
 
-            _tokenServiceMock.Setup(t => t.Verify("invalid-token",It.IsAny<CancellationToken>())).ReturnsAsync((UserDomain)null);
+            _tokenServiceMock.Setup(t => t.Verify("invalid-token", It.IsAny<CancellationToken>())).ReturnsAsync((UserDomain) null);
 
             // Act and Assert
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _authorizerHandler.Handler(request, new Mock<ILambdaContext>().Object));
 
-            _tokenServiceMock.Verify(t => t.Verify("invalid-token",It.IsAny<CancellationToken>()), Times.Once);
+            _tokenServiceMock.Verify(t => t.Verify("invalid-token", It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

@@ -25,8 +25,6 @@ public class AuthorizerHandler
     public async Task<APIGatewayCustomAuthorizerResponse> Handler(APIGatewayCustomAuthorizerRequest request, ILambdaContext? lambdaContext)
     {
         var token = request.QueryStringParameters["Authorization"];
-
-        Console.WriteLine(token);
         var user = await _tokenService.Verify(token);
         if (user == null)
         {
