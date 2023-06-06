@@ -1,4 +1,4 @@
-name: Authorizer Deploy
+name: OnDisconnect Deploy
 on:
   push:
     branches: 
@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      LambdaName: WebSocketAdaptorOnConnectFunction
+      LambdaName: WebSocketAdaptorOnDisconnectFunction
     strategy:
       matrix:
         dotnet: [ '6.0.x' ]

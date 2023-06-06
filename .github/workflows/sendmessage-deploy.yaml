@@ -1,0 +1,44 @@
+name: SendMessage Deploy
+on:
+  push:
+    branches: 
+      - main
+ 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      LambdaName: WebSocketAdaptorSendMessageFunction
+    strategy:
+      matrix:
+        dotnet: [ '6.0.x' ]
+    
+    name: Saas Adm Functions Deployer PROD - BUILD
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-dotnet@v2
+        with:
+          fetch-depth: 0
+          dotnet-version: '6.0.x'
+              
+      - name: Publish
+        run: dotnet publish -c Release src/Adapter/Adapter.csproj
+
+      - name: Install Zip
+        uses: montudor/action-zip@v0.1.0
+        
+      - name: Zip Publish Output
+        run: zip -qq -r ./bundle.zip ./
+        working-directory: src/Adapter/bin/Release/net6.0/publish
+      
+      - name: deploy by aws cli
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          
+      - name: AWS Deploy
+        run: |
+          aws lambda update-function-code --function-name ${{ env.EventListenerLambdaName }} --zip-file fileb://src/Adapter/bin/Release/net6.0/publish/bundle.zip    
