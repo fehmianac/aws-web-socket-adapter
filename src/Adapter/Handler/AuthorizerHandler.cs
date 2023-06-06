@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Domain.Services.Contract;
@@ -26,6 +27,7 @@ public class AuthorizerHandler
         var token = request.AuthorizationToken;
 
         Console.WriteLine(token);
+        Console.WriteLine(JsonSerializer.Serialize(request));
         var user = await _tokenService.Verify(token);
         if (user == null)
         {
