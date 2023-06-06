@@ -13,7 +13,7 @@ jobs:
       matrix:
         dotnet: [ '6.0.x' ]
     
-    name: Saas Adm Functions Deployer PROD - BUILD
+    name: SendMessage Deploy - JOB
 
     steps:
       - uses: actions/checkout@v3
@@ -41,4 +41,4 @@ jobs:
           
       - name: AWS Deploy
         run: |
-          aws lambda update-function-code --function-name ${{ env.EventListenerLambdaName }} --zip-file fileb://src/Adapter/bin/Release/net6.0/publish/bundle.zip    
+          aws lambda update-function-code --function-name ${{ env.LambdaName }} --zip-file fileb://src/Adapter/bin/Release/net6.0/publish/bundle.zip    
