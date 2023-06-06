@@ -201,6 +201,7 @@ namespace Adapter.Tests.Handler
         [Fact]
         public async Task Should_Valid_Default_Ctor()
         {
+            Environment.SetEnvironmentVariable("API_GATEWAY_ENDPOINT","http://localhost:4566");
             var handler = new SendMessageHandler();
         }
     }

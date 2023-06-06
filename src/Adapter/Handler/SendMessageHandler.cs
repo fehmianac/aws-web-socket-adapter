@@ -21,10 +21,9 @@ public class SendMessageHandler
     public SendMessageHandler()
     {
         var serviceUrl = Environment.GetEnvironmentVariable("API_GATEWAY_ENDPOINT");
-        Console.WriteLine("API_GATEWAY_ENDPOINT: " + serviceUrl);
         _amazonApiGatewayManagementApi = new AmazonApiGatewayManagementApiClient(new AmazonApiGatewayManagementApiConfig
         {
-            ServiceURL = serviceUrl
+            ServiceURL = serviceUrl,
         });
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }

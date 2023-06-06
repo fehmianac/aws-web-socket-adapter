@@ -1,7 +1,6 @@
 using System.Net;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using Amazon.Util;
 using Domain.Entities;
 using Domain.Repositories;
 
