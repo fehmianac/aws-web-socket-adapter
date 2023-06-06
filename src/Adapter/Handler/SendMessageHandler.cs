@@ -20,9 +20,11 @@ public class SendMessageHandler
 
     public SendMessageHandler()
     {
+        var serviceUrl = Environment.GetEnvironmentVariable("API_GATEWAY_ENDPOINT");
+        Console.WriteLine("API_GATEWAY_ENDPOINT: " + serviceUrl);
         _amazonApiGatewayManagementApi = new AmazonApiGatewayManagementApiClient(new AmazonApiGatewayManagementApiConfig
         {
-            ServiceURL = Environment.GetEnvironmentVariable("API_GATEWAY_ENDPOINT")
+            ServiceURL = serviceUrl
         });
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
@@ -51,6 +53,8 @@ public class SendMessageHandler
                 continue;
             }
 
+            Console.WriteLine("connectionIds: " + JsonSerializer.Serialize(connectionIds));
+
             var stream = new MemoryStream(Encoding.UTF8.GetBytes(messageDomain.Body));
             foreach (var connection in connectionIds)
             {
@@ -66,14 +70,17 @@ public class SendMessageHandler
     {
         try
         {
+            Console.WriteLine("SendMessageToConnection: " + connectionId + " - " + userId + " - " + body.Length + " bytes");
             await _amazonApiGatewayManagementApi.PostToConnectionAsync(new PostToConnectionRequest
             {
                 ConnectionId = connectionId,
                 Data = body
             });
+            Console.WriteLine("SendMessageToConnection: " + connectionId + " - " + userId + " - " + body.Length + " bytes - success");
         }
         catch (AmazonServiceException e)
         {
+            Console.WriteLine(e.Message);
             if (e.StatusCode == HttpStatusCode.Gone)
             {
                 await _userConnectionRepository.DeleteAsync(new UserConnection
