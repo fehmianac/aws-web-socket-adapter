@@ -1,0 +1,311 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  WebSocketAdaptor
+
+  SAM Template for aws-websockets-adaptor that has the DynamoDB table and Lambda
+  functions needed to demonstrate the Websocket protocol on API Gateway.
+
+Parameters:
+  TableName:
+    Type: String
+    Default: 'websocket_adaptor_connections'
+    Description: (Required) The name of the new DynamoDB to store connection identifiers for each connected clients. Minimum 3 characters
+    MinLength: 3
+    MaxLength: 50
+    AllowedPattern: ^[A-Za-z_]+$
+    ConstraintDescription: 'Required. Can be characters and underscore only. No numbers or special characters allowed.'
+  CodeBucketName:
+    Type: String
+    Default: 'aws-websockets-adaptor'
+    Description: (Required) The name of the S3 bucket where the Lambda function code is stored. Minimum 3 characters
+  JWTSecret:
+    Type: String
+    Default: 'fdre4t5y6u7i8o9p0o9i8u7y6t5r4e3w2q1'
+    Description: (Required) The secret used to sign the JWT token. Minimum 30 characters
+    
+Resources:
+  WebSocketAdaptor:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: aws-websockets-adaptor
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  Authorizer:
+    Type: 'AWS::ApiGatewayV2::Authorizer'
+    Properties:
+      Name: WebSocketAdaptorLambdaAuthorizer
+      ApiId: !Ref WebSocketAdaptor
+      AuthorizerType: REQUEST
+      AuthorizerUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+      IdentitySource:
+        - route.request.header.Authorization
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketAdaptor
+      RouteKey: $connect
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
+      OperationName: ConnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref ConnectInteg
+  ConnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketAdaptor
+      Description: Connect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketAdaptor
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref DisconnectInteg
+  DisconnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketAdaptor
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+    - ConnectRoute
+    - DisconnectRoute
+    Properties:
+      ApiId: !Ref WebSocketAdaptor
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description: Prod Stage
+      DeploymentId: !Ref Deployment
+      ApiId: !Ref WebSocketAdaptor
+
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "connectionId"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "connectionId"
+        KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      SSESpecification:
+        SSEEnabled: True
+      TableName: !Ref TableName
+
+  OnConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: WebSocketAdaptorOnConnectFunction
+      CodeUri: 
+        Bucket: !Ref CodeBucketName
+        Key: onconnect.zip
+      Handler: Adapter.Handler::Adapter.Handler.OnConnectHandler::Handler
+      MemorySize: 256
+      Runtime: dotnet6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+
+  OnConnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketAdaptor
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnConnectFunction
+      Principal: apigateway.amazonaws.com
+
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: WebSocketAdaptorOnDisconnectFunction
+      CodeUri: 
+        Bucket: !Ref CodeBucketName
+        Key: ondisconnect.zip
+      Handler:  Adapter.Handler::Adapter.Handler.OnDisconnectHandler::Handler
+      MemorySize: 256
+      Runtime: dotnet6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+
+  OnDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketAdaptor
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnDisconnectFunction
+      Principal: apigateway.amazonaws.com
+
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: WebSocketAdaptorAuthorizerFunction
+      CodeUri: 
+        Bucket: !Ref CodeBucketName
+        Key: ondisconnect.zip
+      Handler: Adapter.Handler::Adapter.Handler.AuthorizerHandler::Handler
+      MemorySize: 256
+      Runtime: dotnet6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - SSMParameterReadPolicy:
+          ParameterName: !Ref JWTSecret
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+
+  SendMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: WebSocketAdaptorSendMessageFunction
+      CodeUri: 
+        Bucket: !Ref CodeBucketName
+        Key: sendmessage.zip
+      Handler: Adapter.Handler::Adapter.Handler.SendMessageHandler::Handler
+      Role: !GetAtt SendMessageLambdaExecutionRole.Arn
+      MemorySize: 256
+      Runtime: dotnet6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketAdaptor}/*'
+
+  SendMessageLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: allowSqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+              Resource: !GetAtt SendMessageSQS.Arn
+
+  SendMessageFunctionEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt SendMessageSQS.Arn
+      FunctionName: !GetAtt SendMessageFunction.Arn
+
+  SendMessageSQS:
+    Type: 'AWS::SQS::Queue'
+    Properties:
+      QueueName: SendMessageQueue
+      DelaySeconds: 0
+      VisibilityTimeout: 120
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt SendMessageSQSDLQ.Arn
+        maxReceiveCount: 3
+
+  SendMessageSQSDLQ:
+    Type: 'AWS::SQS::Queue'
+    Properties:
+      QueueName: SendMessageSQS_DLQ
+      DelaySeconds: 0
+      VisibilityTimeout: 120
+
+  JWTSecretParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /WebSocketAdapter/JwtSecret
+      Type: String
+      Value: !Ref JWTSecret
+      Description: JWT Secret for authorizer
+
+  SendMessageQueueUrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /WebSocketAdapter/SendMessageQueueUrl 
+      Type: String
+      Value: !GetAtt SendMessageSQS.QueueUrl
+      Description: Message queue URL for SendMessage function
+    DependsOn: 
+      - SendMessageSQS
+
+Outputs:
+  ConnectionsTableArn:
+    Description: "Connections table ARN"
+    Value: !GetAtt ConnectionsTable.Arn
+
+  OnConnectFunctionArn:
+    Description: "OnConnect function ARN"
+    Value: !GetAtt OnConnectFunction.Arn
+
+  OnDisconnectFunctionArn:
+    Description: "OnDisconnect function ARN"
+    Value: !GetAtt OnDisconnectFunction.Arn
+
+  SendMessageFunctionArn:
+    Description: "SendMessage function ARN"
+    Value: !GetAtt SendMessageFunction.Arn
+
+  WebSocketURI:
+    Description: "The WSS Protocol URI to connect to"
+    Value: !Join [ '', [ 'wss://', !Ref WebSocketAdaptor, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref 'Stage'] ]
