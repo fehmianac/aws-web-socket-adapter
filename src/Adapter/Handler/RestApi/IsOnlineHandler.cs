@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Domain.Repositories;
@@ -33,9 +34,15 @@ public class IsOnlineHandler
         }
 
         var isOnline = await _userConnectionRepository.GetOnlineStatusAsync(userId);
+        var response = new {status = "offline"};
+        if (isOnline)
+        {
+            response = new {status = "online"};
+        }
+
         return new APIGatewayProxyResponse
         {
-            Body = isOnline ? "online" : "offline",
+            Body = JsonSerializer.Serialize(response),
             StatusCode = (int) HttpStatusCode.OK
         };
     }
