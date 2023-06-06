@@ -20,7 +20,10 @@ public class SendMessageHandler
 
     public SendMessageHandler()
     {
-        _amazonApiGatewayManagementApi = new AmazonApiGatewayManagementApiClient();
+        _amazonApiGatewayManagementApi = new AmazonApiGatewayManagementApiClient(new AmazonApiGatewayManagementApiConfig
+        {
+            ServiceURL = Environment.GetEnvironmentVariable("API_GATEWAY_ENDPOINT")
+        });
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
 
