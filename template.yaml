@@ -37,12 +37,13 @@ Resources:
     Properties:
       Name: WebSocketAdaptorLambdaAuthorizer
       ApiId: !Ref WebSocketAdaptor
+      
       AuthorizerType: REQUEST
       AuthorizerUri: 
         Fn::Sub:
             arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
       IdentitySource:
-        - route.request.header.Authorization
+        - route.request.querystring.Authorization
 
   ConnectRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -106,14 +107,17 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: "connectionId"
+      - AttributeName: "pk"
+        AttributeType: "S"
+      - AttributeName: "sk"
         AttributeType: "S"
       KeySchema:
-      - AttributeName: "connectionId"
+      - AttributeName: "pk"
         KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
+      - AttributeName: "sk"
+        KeyType: "RANGE"
+      BillingMode:
+        PAY_PER_REQUEST
       SSESpecification:
         SSEEnabled: True
       TableName: !Ref TableName
@@ -125,8 +129,10 @@ Resources:
       CodeUri: 
         Bucket: !Ref CodeBucketName
         Key: onconnect.zip
-      Handler: Adapter.Handler::Adapter.Handler.OnConnectHandler::Handler
-      MemorySize: 256
+      Handler: Adapter::Adapter.Handler.OnConnectHandler::Handler
+      Role: !GetAtt OnConnectFunctionLambdaExecutionRole.Arn
+      MemorySize: 512
+      Timeout: 180
       Runtime: dotnet6
       Environment:
         Variables:
@@ -144,6 +150,38 @@ Resources:
       FunctionName: !Ref OnConnectFunction
       Principal: apigateway.amazonaws.com
 
+  OnConnectFunctionLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: OnConnectDynamoDbPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              Resource: !GetAtt ConnectionsTable.Arn
+
   OnDisconnectFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -151,8 +189,10 @@ Resources:
       CodeUri: 
         Bucket: !Ref CodeBucketName
         Key: ondisconnect.zip
-      Handler:  Adapter.Handler::Adapter.Handler.OnDisconnectHandler::Handler
-      MemorySize: 256
+      Handler:  Adapter::Adapter.Handler.OnDisconnectHandler::Handler
+      Role: !GetAtt OnDisconnectFunctionLambdaExecutionRole.Arn
+      MemorySize: 512
+      Timeout: 180
       Runtime: dotnet6
       Environment:
         Variables:
@@ -170,6 +210,36 @@ Resources:
       FunctionName: !Ref OnDisconnectFunction
       Principal: apigateway.amazonaws.com
 
+  OnDisconnectFunctionLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: OnDisconnectDynamoDBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              Resource: !GetAtt ConnectionsTable.Arn
   AuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -177,17 +247,47 @@ Resources:
       CodeUri: 
         Bucket: !Ref CodeBucketName
         Key: ondisconnect.zip
-      Handler: Adapter.Handler::Adapter.Handler.AuthorizerHandler::Handler
-      MemorySize: 256
+      Handler: Adapter::Adapter.Handler.AuthorizerHandler::Handler
+      Role: !GetAtt AuthorizerFunctionLambdaExecutionRole.Arn
+      MemorySize: 512
+      Timeout: 180
       Runtime: dotnet6
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
       Policies:
-      - SSMParameterReadPolicy:
-          ParameterName: !Ref JWTSecret
       - DynamoDBCrudPolicy:
           TableName: !Ref TableName
+
+  AuthorizerFunctionLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: allowParameterStore
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - ssm:GetParameter
+              Resource: '*'
 
   SendMessageFunction:
     Type: AWS::Serverless::Function
@@ -196,13 +296,15 @@ Resources:
       CodeUri: 
         Bucket: !Ref CodeBucketName
         Key: sendmessage.zip
-      Handler: Adapter.Handler::Adapter.Handler.SendMessageHandler::Handler
+      Handler: Adapter::Adapter.Handler.SendMessageHandler::Handler
       Role: !GetAtt SendMessageLambdaExecutionRole.Arn
-      MemorySize: 256
+      MemorySize: 512
+      Timeout: 120
       Runtime: dotnet6
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
+          API_GATEWAY_ENDPOINT: !Sub 'https://${WebSocketAdaptor}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
       Policies:
       - DynamoDBCrudPolicy:
           TableName: !Ref TableName
@@ -245,6 +347,25 @@ Resources:
               - sqs:GetQueueAttributes
               - sqs:ChangeMessageVisibility
               Resource: !GetAtt SendMessageSQS.Arn
+              
+        - PolicyName: SendMessageDynamoDBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              Resource: !GetAtt ConnectionsTable.Arn
+        - PolicyName: ApiGatewayManageConnection
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - 'execute-api:ManageConnections'
+              Resource:
+              - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketAdaptor}/*'
 
   SendMessageFunctionEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
