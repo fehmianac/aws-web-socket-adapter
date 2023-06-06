@@ -25,9 +25,13 @@ public class AuthorizerHandler
     {
         var token = request.AuthorizationToken;
 
+        Console.WriteLine(token);
         var user = await _tokenService.Verify(token);
         if (user == null)
+        {
             throw new UnauthorizedAccessException("invalid token");
+        }
+            
 
         return new APIGatewayCustomAuthorizerResponse
         {

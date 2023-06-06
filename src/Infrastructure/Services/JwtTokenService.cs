@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Text.Json;
 using Domain.Domain;
 using Domain.Services.Contract;
 using Microsoft.IdentityModel.Tokens;
@@ -18,6 +19,7 @@ public class JwtTokenService : ITokenService
     public async Task<UserDomain?> Verify(string token, CancellationToken cancellationToken = default)
     {
         var jwtSecret = await _secretService.GetJwtSecret(cancellationToken);
+        Console.WriteLine(jwtSecret);
         var tokenHandler = new JwtSecurityTokenHandler();
         var validationParameters = new TokenValidationParameters
         {
@@ -30,11 +32,16 @@ public class JwtTokenService : ITokenService
         var tokenValidationResult = await tokenHandler.ValidateTokenAsync(token, validationParameters);
         if (!tokenValidationResult.IsValid)
         {
+            Console.WriteLine("Token is invalid");
             return null;
         }
 
+        Console.WriteLine(JsonSerializer.Serialize(tokenValidationResult.Claims));
         if (!tokenValidationResult.Claims.ContainsKey("userId"))
+        {
             return null;
+        }
+
 
         var userId = tokenValidationResult.Claims["userId"].ToString();
 
