@@ -1,5 +1,4 @@
 # AWS WebSocket Adapter
-Sure! Based on the information you provided, here's an example README file structure for your C# project:
 
 A C# project that serves as an adapter to AWS API Gateway WebSockets.
 
