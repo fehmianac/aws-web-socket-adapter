@@ -87,6 +87,11 @@ public class SendMessageHandler
                     UserId = userId,
                     ConnectionId = connectionId
                 });
+
+                await _userConnectionRepository.DeleteAsync(new OnlineStatus
+                {
+                    UserId = userId
+                });
             }
         }
     }

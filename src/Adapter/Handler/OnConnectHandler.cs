@@ -40,6 +40,12 @@ public class OnConnectHandler
             UserId = userId
         });
 
+        await _userConnectionRepository.SaveAsync(new OnlineStatus
+        {
+            UserId = userId,
+            ConnectedDate = DateTime.UtcNow
+        });
+
         return new APIGatewayProxyResponse
         {
             Body = "Connected",

@@ -1,53 +1,41 @@
 using System.Net;
-using Adapter.Extensions;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using Domain.Entities;
 using Domain.Repositories;
 using Infrastructure.Factory;
 
-namespace Adapter.Handler;
+namespace Adapter.Handler.RestApi;
 
-public class OnDisconnectHandler
+public class IsOnlineHandler
 {
     private readonly IUserConnectionRepository _userConnectionRepository;
 
-    public OnDisconnectHandler()
+    public IsOnlineHandler()
     {
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
 
-    public OnDisconnectHandler(IUserConnectionRepository userConnectionRepository)
+    public IsOnlineHandler(IUserConnectionRepository userConnectionRepository)
     {
         _userConnectionRepository = userConnectionRepository;
     }
 
     public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest request, ILambdaContext context)
     {
-        var userId = request.RequestContext.GetUserId();
+        request.PathParameters.TryGetValue("userId", out var userId);
+
         if (string.IsNullOrEmpty(userId))
         {
             return new APIGatewayProxyResponse
             {
-                Body = "invalid authorization",
-                StatusCode = (int) HttpStatusCode.BadRequest
+                StatusCode = (int) HttpStatusCode.NotFound
             };
         }
 
-        await _userConnectionRepository.DeleteAsync(new UserConnection
-        {
-            ConnectionId = request.RequestContext.ConnectionId,
-            UserId = userId
-        });
-
-        await _userConnectionRepository.DeleteAsync(new OnlineStatus
-        {
-            UserId = userId
-        });
-
+        var isOnline = await _userConnectionRepository.GetOnlineStatusAsync(userId);
         return new APIGatewayProxyResponse
         {
-            Body = "Connected",
+            Body = isOnline ? "online" : "offline",
             StatusCode = (int) HttpStatusCode.OK
         };
     }

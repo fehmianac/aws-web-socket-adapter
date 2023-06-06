@@ -57,6 +57,7 @@ Resources:
         - '/'
         - - 'integrations'
           - !Ref ConnectInteg
+
   ConnectInteg:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -410,6 +411,195 @@ Resources:
     DependsOn: 
       - SendMessageSQS
 
+
+  WebSocketAdaptorRestApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: aws-websockets-adaptor-rest-api
+      ProtocolType: HTTP
+
+  IsOnlineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: WebSocketAdaptorRestIsOnlineFunction
+      CodeUri: 
+        Bucket: !Ref CodeBucketName
+        Key: ondisconnect.zip
+      Handler:  Adapter::Adapter.Handler.RestApi.IsOnlineHandler::Handler
+      Role: !GetAtt IsOnlineFunctionLambdaExecutionRole.Arn
+      MemorySize: 512
+      Timeout: 180
+      Runtime: dotnet6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+
+  IsOnlineFunctionPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketAdaptorRestApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref IsOnlineFunction
+      Principal: apigateway.amazonaws.com
+
+  IsOnlineFunctionLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: IsOnlineFunctionDynamoDBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:Query
+              - dynamoDb:GetItem
+              Resource: !GetAtt ConnectionsTable.Arn
+
+  IsOnlineRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketAdaptorRestApi
+      RouteKey: 'GET /user/{userId}/online'
+      AuthorizationType: NONE
+      OperationName: IsOnlineRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref IsOnlineRouteInteg
+
+  IsOnlineRouteInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketAdaptorRestApi
+      PayloadFormatVersion: '2.0'
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${IsOnlineFunction.Arn}/invocations
+
+
+  OnlineListFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: WebSocketAdaptorRestOnlineListFunction
+      CodeUri: 
+        Bucket: !Ref CodeBucketName
+        Key: ondisconnect.zip
+      Handler:  Adapter::Adapter.Handler.RestApi.OnlineListHandler::Handler
+      Role: !GetAtt OnlineListFunctionLambdaExecutionRole.Arn
+      MemorySize: 512
+      Timeout: 180
+      Runtime: dotnet6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+
+  OnlineListFunctionPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketAdaptorRestApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnlineListFunction
+      Principal: apigateway.amazonaws.com
+
+  OnlineListFunctionLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: IsOnlineFunctionDynamoDBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:Query
+              - dynamoDb:GetItem
+              Resource: !GetAtt ConnectionsTable.Arn
+
+  OnlineListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketAdaptorRestApi
+      RouteKey: 'GET /user/online'
+      AuthorizationType: NONE
+      OperationName: OnlineListRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref OnlineListRouteInteg
+
+  OnlineListRouteInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketAdaptorRestApi
+      PayloadFormatVersion: '2.0'
+      Description: OnlineListRouteInteg Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnlineListFunction.Arn}/invocations
+
+  WebSocketAdaptorRestApiDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+    - IsOnlineRoute
+    - DisconnectRoute
+    Properties:
+      ApiId: !Ref WebSocketAdaptorRestApi
+
+  WebSocketAdaptorRestApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description: Prod Stage
+      DeploymentId: !Ref WebSocketAdaptorRestApiDeployment
+
+
+      ApiId: !Ref WebSocketAdaptorRestApi
 Outputs:
   ConnectionsTableArn:
     Description: "Connections table ARN"
