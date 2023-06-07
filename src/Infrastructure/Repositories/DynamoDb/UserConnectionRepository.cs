@@ -20,26 +20,31 @@ public class UserConnectionRepository : IUserConnectionRepository
 
     public async Task<UserConnection?> GetAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var request = new GetItemRequest()
+        var request = new QueryRequest()
         {
             TableName = _tableName,
-            Key = new Dictionary<string, AttributeValue>
+            KeyConditionExpression = "pk = :pk and sk = :sk",
+            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
             {
                 {":pk", new AttributeValue {S = UserConnectionPk}},
                 {":sk", new AttributeValue {S = userId}}
-            }
+            },
         };
 
         try
         {
-            var response = await _amazonDynamoDb.GetItemAsync(request, cancellationToken);
-
-            var item = response.Item;
+            var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
+            
+            if (!response.Items.Any())
+            {
+                return null;
+            }
+            var item = response.Items.FirstOrDefault();
             if (item == null)
             {
                 return null;
             }
-
+            
             return new UserConnection
             {
                 UserId = item["sk"].S,
