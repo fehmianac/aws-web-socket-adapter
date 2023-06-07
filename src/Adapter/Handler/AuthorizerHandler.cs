@@ -5,6 +5,7 @@ using Infrastructure.Factory;
 
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
+
 namespace Adapter.Handler;
 
 public class AuthorizerHandler
@@ -20,16 +21,17 @@ public class AuthorizerHandler
     {
         _tokenService = tokenService;
     }
-    
+
     public async Task<APIGatewayCustomAuthorizerResponse> Handler(APIGatewayCustomAuthorizerRequest request, ILambdaContext? lambdaContext)
     {
         var token = request.QueryStringParameters["Authorization"];
+        Console.WriteLine("token: " + token);
         var user = await _tokenService.Verify(token);
         if (user == null)
         {
-            throw new UnauthorizedAccessException("invalid token");
+            throw new UnauthorizedAccessException("Unauthorized");
         }
-            
+
 
         return new APIGatewayCustomAuthorizerResponse
         {
