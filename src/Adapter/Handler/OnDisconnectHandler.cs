@@ -52,7 +52,7 @@ public class OnDisconnectHandler
         else
         {
             await _userConnectionRepository.DeleteAsync(userId);
-            //TODO put last activity
+            await _userConnectionRepository.SaveLastActivityAsync(userId);
         }
 
         return new APIGatewayProxyResponse
