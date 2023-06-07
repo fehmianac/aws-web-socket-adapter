@@ -1,58 +1,84 @@
-# AWS WebSocket Adapter
+Certainly! Here's the updated README file that includes example cURL commands for `/user/online?userIds=1234` and WebSocket connection:
 
-A C# project that serves as an adapter to AWS API Gateway WebSockets.
+# AWS API Gateway WebSocket Integration Manager
 
-## Introduction
+The AWS API Gateway WebSocket Integration Manager is a C# project that facilitates the management of AWS API Gateway WebSocket integrations for other projects. It provides a one-click deployment process, allowing users to quickly set up and use the project in their own AWS accounts.
 
-This project provides a convenient one-click deployment solution for integrating AWS API Gateway WebSockets with your application. By leveraging this project, you can seamlessly connect your C# project to AWS API Gateway WebSockets without the need for extensive technical knowledge or manual setup. The project consists of three main layers: Domain, Infrastructure, and Adapter, which handle various aspects of the integration.
+## Installation
 
-## Architecture Diagram
+To install the AWS API Gateway WebSocket Integration Manager, follow these steps:
+
+1. Create an S3 bucket in your AWS account to store the deployment package.
+2. Upload the `deploy.zip` file to the S3 bucket. This package contains the necessary files for deployment.
+3. Deploy the dummy source code to AWS Lambda by executing the CloudFormation template provided in `template.yaml`. This sets up the required Lambda functions for the project.
+
+## Usage
+
+The AWS API Gateway WebSocket Integration Manager consists of the following Lambda functions:
+
+1. **WebSocketAdaptorOnConnectFunction**: This function is triggered when a client attempts to connect to the WebSocket. It stores the connection ID and user ID in DynamoDB.
+
+2. **WebSocketAdaptorOnDisconnectFunction**: This function is triggered when a client disconnects from the WebSocket. It deletes the active connection ID for the user and logs the last activity date.
+
+3. **WebSocketAdaptorSendMessageFunction**: This function listens to an SQS queue for sending socket messages to clients. The message structure is defined as follows:
+
+```csharp
+public class MessageDomain
+{
+    public string UserId { get; set; }
+    
+    public string Body { get; set; }
+}
+```
+
+The `WebSocketAdaptorSendMessageFunction` requires the `SendMessageQueueUrl` parameter to be set. You can configure the `SendMessageQueueUrl` by providing the parameter name `/WebSocketAdapter/SendMessageQueueUrl`.
+
+4. **WebSocketAdaptorAuthorizerFunction**: This function handles the authorization process for connecting to the WebSocket using JSON Web Tokens (JWT). The JWT secret is stored in the Parameter Store with the name `/WebSocketAdapter/JwtSecret`. The JWT must contain a `userId` claim for successful authorization.
+
+5. **WebSocketAdaptorRestOnlineListFunction**: This function provides online status or last activity date for users. When called without any parameters, it returns a list of online users. When `userIds` parameter is provided via the query string, the function returns the online status for the requested user IDs.
+
+After deploying the project, two API Gateway instances will be created: one for WebSocket communication and another for HTTP API. You can obtain the URLs for these instances from the AWS Management Console.
+
+## Infrastructure Setup
+
+The infrastructure setup for the AWS API Gateway WebSocket Integration Manager is provided as a CloudFormation template (`template.yaml`). You can use this template for the initial setup of the infrastructure.
+
+## Infrastructure Diagram
 
 ![infra.png](docs%2Finfra.png)
 
-## Features
+## Deployment Pipelines
 
-- Connects AWS API Gateway WebSockets to your C# project.
-- Handles WebSocket events such as OnConnected, OnDisconnected, SendMessage, and Authorizer.
-- Verifies JWT tokens during the OnConnected event using an authorizer.
-- Sends messages to AWS API Gateway Management API via an SQS queue using the SendMessage function.
+Example deployment pipelines using GitHub Actions are available in this repository. You can refer to these pipelines to set up your own CI/CD workflows for the project.
 
-## Example Usage
+## Example API Requests
 
-Here are a few examples to help you get started with using this project:
+Here are some example cURL commands for making API requests to the deployed endpoints:
 
-1. **OnConnected**: This function is triggered when a client connects to the WebSocket. You can customize the behavior in the `OnConnected` Lambda function code.
+1. **Get online status for specific users**:
 
-2. **OnDisconnected**: This function is triggered when a client disconnects from the WebSocket. You can modify the `OnDisconnected` Lambda function code to handle the disconnection event.
+```shell
+curl -X GET "https://your-api-gateway-url/user/online?userIds=1234" -H "Authorization: Bearer <your_jwt_token>"
+```
 
-3. **SendMessage**: This function consumes data from an SQS queue and sends a message to the AWS API Gateway Management API. You can customize the logic inside the `SendMessage` Lambda function to process the received data and send the appropriate message.
+Replace `https://your-api-gateway-url` with the actual URL of your deployed API Gateway WebSocket instance.
 
-4. **Authorizer**: This function verifies JWT tokens during the OnConnected event. You can modify the `Authorizer` Lambda function code to implement your own JWT verification logic.
+2. **WebSocket Connection**:
 
-## Prerequisites
+```shell
+wscat -c "wss://your-socket-url?Authorization=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwidXNlcklkIjoiMTIzNCIsImlhdCI6MjAxNjIzOTAyMiwiZXhwIjoyMDE2MjM5MDIyfQ.6C7xpaC9_vmadA72tABVkqXH9HWcPY4RE8dGALnT-Hw"
+```
 
-Before running the project, make sure you have the following prerequisites:
+Make sure to replace `your-socket-url` with the actual WebSocket URL of your deployed API Gateway instance and `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwidXNlcklkIjoiMTIzNCIsImlhdCI6MjAxNjIzOTAyMiwiZXhwIjoyMDE2MjM5MDIyfQ.6C7xpaC9_vmadA72tABVkqXH9HWcPY4RE8dGALnT-Hw` with your actual JWT token.
 
-- [AWS Account](https://aws.amazon.com/) with appropriate permissions and an API Gateway WebSocket configured.
-- [C#](https://docs.microsoft.com/en-us/dotnet/csharp/) environment set up on your machine.
+Please note that the `wscat` tool is used to establish the WebSocket connection, and you may need to install it separately if you haven't already.
 
-## Getting Started
+Let me know if you have any further questions!
 
-To get started with the project, follow these steps:
+Ensure you have the `wscat` tool installed to establish a WebSocket connection.
 
-1. Clone the repository: `git clone https://github.com/fehmianac/aws-web-socket-adapter.git`
-3. Configure the AWS credentials and region in the project.
-4. Build and deploy the Lambda functions to your AWS account.
-5. Set up the necessary event mappings and configurations in AWS API Gateway.
-6. Run the project.
-
-For detailed instructions on how to configure and deploy the project, refer to the [documentation](link-to-documentation).
 
 ## Contributors
 
 - [Fehmi Anaç]([link-to-your-profile](https://github.com/fehmianac)) - Project Lead
-
-
-## License
-
-This project is licensed under the [MIT License](link-to-license-file).
+---
