@@ -30,37 +30,28 @@ public class UserConnectionRepository : IUserConnectionRepository
                 {":sk", new AttributeValue {S = userId}}
             },
         };
-
-        try
-        {
-            var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
+        
+        var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
             
-            if (!response.Items.Any())
-            {
-                return null;
-            }
-            var item = response.Items.FirstOrDefault();
-            if (item == null)
-            {
-                return null;
-            }
-            
-            return new UserConnection
-            {
-                UserId = item["sk"].S,
-                Connections = item["connections"].L.Select(q => new UserConnection.ConnectionInfo
-                {
-                    Id = q.M["id"].S,
-                    Time = DateTime.Parse(q.M["time"].S)
-                }).ToList()
-            };
-        }
-        catch (AmazonDynamoDBException e)
+        if (!response.Items.Any())
         {
-            Console.WriteLine(e.Message);
             return null;
         }
-        
+        var item = response.Items.FirstOrDefault();
+        if (item == null)
+        {
+            return null;
+        }
+            
+        return new UserConnection
+        {
+            UserId = item["sk"].S,
+            Connections = item["connections"].L.Select(q => new UserConnection.ConnectionInfo
+            {
+                Id = q.M["id"].S,
+                Time = DateTime.Parse(q.M["time"].S)
+            }).ToList()
+        };
     }
 
     public async Task<bool> SaveAsync(UserConnection userConnection, CancellationToken cancellationToken = default)
@@ -119,7 +110,7 @@ public class UserConnectionRepository : IUserConnectionRepository
             RequestItems = new Dictionary<string, KeysAndAttributes>
             {
                 {
-                    "requestedKeys", new KeysAndAttributes
+                    _tableName, new KeysAndAttributes
                     {
                         Keys = userIds.Select(q => new Dictionary<string, AttributeValue>
                         {
@@ -131,7 +122,7 @@ public class UserConnectionRepository : IUserConnectionRepository
                 }
             }
         }, cancellationToken);
-        var items = batchGetItemResponse.Responses["requestedKeys"];
+        var items = batchGetItemResponse.Responses[_tableName];
         return items.Select(q => q["sk"].S).ToList();
     }
 
@@ -177,7 +168,7 @@ public class UserConnectionRepository : IUserConnectionRepository
             RequestItems = new Dictionary<string, KeysAndAttributes>
             {
                 {
-                    "requestedKeys", new KeysAndAttributes
+                    _tableName, new KeysAndAttributes
                     {
                         Keys = userIds.Select(q => new Dictionary<string, AttributeValue>
                         {
@@ -189,7 +180,7 @@ public class UserConnectionRepository : IUserConnectionRepository
             }
         }, cancellationToken);
 
-        var items = batchGetItemResponse.Responses["requestedKeys"];
+        var items = batchGetItemResponse.Responses[_tableName];
         return items.Select(q => new UserLastActivity
         {
             Id = q["sk"].S,

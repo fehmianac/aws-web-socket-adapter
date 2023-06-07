@@ -242,6 +242,7 @@ Resources:
                   - dynamodb:DeleteItem
                   - dynamodb:Query
                   - dynamodb:GetItem
+                  - dynamodb:PutItem
                 Resource: !GetAtt ConnectionsTable.Arn
   AuthorizerFunction:
     Type: AWS::Serverless::Function
