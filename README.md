@@ -56,7 +56,7 @@ Here are some example cURL commands for making API requests to the deployed endp
 1. **Get online status for specific users**:
 
 ```shell
-curl -X GET "https://your-api-gateway-url/user/online?userIds=1234" -H "Authorization: Bearer <your_jwt_token>"
+curl -X GET "https://your-api-gateway-url/user/online?userIds=1234"
 ```
 
 Replace `https://your-api-gateway-url` with the actual URL of your deployed API Gateway WebSocket instance.
