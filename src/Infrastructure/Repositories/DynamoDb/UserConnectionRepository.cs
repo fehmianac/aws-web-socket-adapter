@@ -52,6 +52,7 @@ public class UserConnectionRepository : IUserConnectionRepository
         }
         catch (AmazonDynamoDBException e)
         {
+            Console.WriteLine(e.Message);
             return null;
         }
         

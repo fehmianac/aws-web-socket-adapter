@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Adapter.Extensions;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
@@ -40,6 +41,7 @@ public class OnConnectHandler
             Connections = new List<UserConnection.ConnectionInfo>()
         };
 
+        Console.WriteLine(JsonSerializer.Serialize(userConnection));
         userConnection.Connections.Add(new UserConnection.ConnectionInfo
         {
             Id = request.RequestContext.ConnectionId,

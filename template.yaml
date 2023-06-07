@@ -477,8 +477,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:Query
-                  - dynamoDb:GetItem
-                  - dynamoDb:BatchGetItem
+                  - dynamodb:GetItem
+                  - dynamodb:BatchGetItem
                 Resource: !GetAtt ConnectionsTable.Arn
 
   OnlineListRoute:
