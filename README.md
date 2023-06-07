@@ -1,5 +1,3 @@
-Certainly! Here's the updated README file that includes example cURL commands for `/user/online?userIds=1234` and WebSocket connection:
-
 # AWS API Gateway WebSocket Integration Manager
 
 The AWS API Gateway WebSocket Integration Manager is a C# project that facilitates the management of AWS API Gateway WebSocket integrations for other projects. It provides a one-click deployment process, allowing users to quickly set up and use the project in their own AWS accounts.
