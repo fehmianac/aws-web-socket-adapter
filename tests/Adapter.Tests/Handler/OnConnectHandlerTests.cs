@@ -12,57 +12,58 @@ namespace Adapter.Tests.Handler
     public class OnConnectHandlerTests
     {
         private readonly Mock<IUserConnectionRepository> _userConnectionRepositoryMock;
-        private readonly OnConnectHandler _onConnectHandler;
+        private readonly OnConnectHandler _handler;
 
         public OnConnectHandlerTests()
         {
             _userConnectionRepositoryMock = new Mock<IUserConnectionRepository>();
-            _onConnectHandler = new OnConnectHandler(_userConnectionRepositoryMock.Object);
+            _handler = new OnConnectHandler(_userConnectionRepositoryMock.Object);
         }
 
         [Fact]
-        public async Task Handler_Should_Return_BadRequest_Response_When_UserId_Is_NullOrEmpty()
+        public async Task Handler_ValidUserId_ReturnsConnectedResponse()
         {
             // Arrange
-            var request = new APIGatewayProxyRequest();
-            var context = new Mock<ILambdaContext>().Object;
-
-            // Act
-            var response = await _onConnectHandler.Handler(request, context);
-
-            // Assert
-            Assert.Equal((int) HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Equal("invalid authorization", response.Body);
-            _userConnectionRepositoryMock.Verify(r => r.SaveAsync(It.IsAny<UserConnection>(), It.IsAny<CancellationToken>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task Handler_Should_Save_UserConnection_And_Return_OK_Response_When_UserId_Is_Valid()
-        {
-            // Arrange
-            var userId = "123";
-            var connectionId = "456";
+            var userId = "user1";
+            var connectionId = "connection1";
             var request = new APIGatewayProxyRequest
             {
                 RequestContext = new APIGatewayProxyRequest.ProxyRequestContext
                 {
+                    Authorizer  = new APIGatewayCustomAuthorizerContext{{"userId", userId}},
                     ConnectionId = connectionId
                 }
             };
-            request.RequestContext.Authorizer = new APIGatewayCustomAuthorizerContext()
-            {
-                {"userId", userId}
-            };
-            var context = new Mock<ILambdaContext>().Object;
+            var context = new Mock<ILambdaContext>();
+
+            _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId,CancellationToken.None)).ReturnsAsync((UserConnection)null);
 
             // Act
-            var response = await _onConnectHandler.Handler(request, context);
+            var response = await _handler.Handler(request, context.Object);
 
             // Assert
-            Assert.Equal((int) HttpStatusCode.OK, response.StatusCode);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(),CancellationToken.None), Times.Once);
+            _userConnectionRepositoryMock.Verify(repo => repo.GetAsync(userId,CancellationToken.None), Times.Once);
+
             Assert.Equal("Connected", response.Body);
-            _userConnectionRepositoryMock.Verify(r => r.SaveAsync(
-                It.Is<UserConnection>(uc => uc.UserId == userId && uc.ConnectionId == connectionId),It.IsAny<CancellationToken>()), Times.Once);
+            Assert.Equal((int)HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Handler_InvalidUserId_ReturnsBadRequestResponse()
+        {
+            // Arrange
+            var request = new APIGatewayProxyRequest();
+            var context = new Mock<ILambdaContext>();
+
+            // Act
+            var response = await _handler.Handler(request, context.Object);
+
+            // Assert
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(),CancellationToken.None), Times.Never);
+
+            Assert.Equal("invalid authorization", response.Body);
+            Assert.Equal((int)HttpStatusCode.BadRequest, response.StatusCode);
         }
         
         [Fact]
@@ -71,5 +72,5 @@ namespace Adapter.Tests.Handler
             var handler = new OnConnectHandler();
         }
     }
-    
 }
+

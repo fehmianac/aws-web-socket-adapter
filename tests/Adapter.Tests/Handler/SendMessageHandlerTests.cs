@@ -1,4 +1,4 @@
-using System.Net;
+using System.Text;
 using System.Text.Json;
 using Adapter.Handler;
 using Amazon.ApiGatewayManagementApi;
@@ -17,185 +17,132 @@ namespace Adapter.Tests.Handler
     {
         private readonly Mock<IAmazonApiGatewayManagementApi> _amazonApiGatewayManagementApiMock;
         private readonly Mock<IUserConnectionRepository> _userConnectionRepositoryMock;
-        private readonly SendMessageHandler _sendMessageHandler;
+        private readonly SendMessageHandler _handler;
 
         public SendMessageHandlerTests()
         {
             _amazonApiGatewayManagementApiMock = new Mock<IAmazonApiGatewayManagementApi>();
             _userConnectionRepositoryMock = new Mock<IUserConnectionRepository>();
-            _sendMessageHandler = new SendMessageHandler(_amazonApiGatewayManagementApiMock.Object, _userConnectionRepositoryMock.Object);
+            _handler = new SendMessageHandler(
+                _amazonApiGatewayManagementApiMock.Object,
+                _userConnectionRepositoryMock.Object
+            );
         }
 
         [Fact]
-        public async Task Handler_Should_Send_Messages_To_Connections()
+        public async Task Handler_ValidMessageWithExistingUserConnections_SendsMessageToConnections()
         {
             // Arrange
-            var message1 = new MessageDomain {UserId = "user1", Body = "Message 1"};
-            var message2 = new MessageDomain {UserId = "user2", Body = "Message 2"};
-            var message3 = new MessageDomain {UserId = "user1", Body = "Message 3"};
-
-            var sqsEvent = new SQSEvent
+            var userId = "user1";
+            var connectionId1 = "connection1";
+            var connectionId2 = "connection2";
+            var messageBody = "Test message";
+            var message = new SQSEvent.SQSMessage
             {
-                Records = new List<SQSEvent.SQSMessage>
+                Body = JsonSerializer.Serialize(new MessageDomain
                 {
-                    new() {Body = JsonSerializer.Serialize(message1)},
-                    new() {Body = JsonSerializer.Serialize(message2)},
-                    new() {Body = JsonSerializer.Serialize(message3)}
+                    UserId = userId,
+                    Body = messageBody
+                })
+            };
+            var context = new Mock<ILambdaContext>();
+
+            var userConnection = new UserConnection
+            {
+                UserId = userId,
+                Connections = new List<UserConnection.ConnectionInfo>
+                {
+                    new UserConnection.ConnectionInfo
+                    {
+                        Id = connectionId1,
+                        Time = DateTime.UtcNow
+                    },
+                    new UserConnection.ConnectionInfo
+                    {
+                        Id = connectionId2,
+                        Time = DateTime.UtcNow
+                    }
                 }
             };
 
-            var connection1 = new UserConnection {UserId = "user1", ConnectionId = "connection1"};
-            var connection2 = new UserConnection {UserId = "user1", ConnectionId = "connection2"};
-            var connection3 = new UserConnection {UserId = "user2", ConnectionId = "connection3"};
-
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user1", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection1, connection2});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user2", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection3});
-
+            _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId,CancellationToken.None)).ReturnsAsync(userConnection);
             _amazonApiGatewayManagementApiMock
-                .Setup(a => a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(new PostToConnectionResponse());
+                .Setup(api => api.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(),CancellationToken.None))
+                .Returns(Task.FromResult(new PostToConnectionResponse()));
 
             // Act
-            var response = await _sendMessageHandler.Handler(sqsEvent, new Mock<ILambdaContext>().Object);
+            var response = await _handler.Handler(new SQSEvent { Records = new List<SQSEvent.SQSMessage> { message } }, context.Object);
 
             // Assert
-            Assert.NotNull(response);
-            Assert.Empty(response.BatchItemFailures);
-
-            _amazonApiGatewayManagementApiMock.Verify(a =>
-                a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(5));
-        }
-
-        [Fact]
-        public async Task Handler_Should_Remove_Gone_Connection()
-        {
-            var message1 = new MessageDomain {UserId = "user1", Body = "Message 1"};
-            var message2 = new MessageDomain {UserId = "user2", Body = "Message 2"};
-            var message3 = new MessageDomain {UserId = "user3", Body = "Message 3"};
-
-            var sqsEvent = new SQSEvent
-            {
-                Records = new List<SQSEvent.SQSMessage>
-                {
-                    new() {Body = JsonSerializer.Serialize(message1)},
-                    new() {Body = JsonSerializer.Serialize(message2)},
-                    new() {Body = JsonSerializer.Serialize(message3)}
-                }
-            };
-
-            var connection1 = new UserConnection {UserId = "user1", ConnectionId = "connection1"};
-            var connection2 = new UserConnection {UserId = "user1", ConnectionId = "connection2"};
-            var connection3 = new UserConnection {UserId = "user2", ConnectionId = "connection3"};
-            var connection4 = new UserConnection {UserId = "user3", ConnectionId = "connection4"};
-
-            _userConnectionRepositoryMock.Setup(q => q.DeleteAsync(It.Is<UserConnection>(q => q.ConnectionId == "connection4"), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user1", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection1, connection2});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user2", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection3});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user3", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection4});
-
-            _amazonApiGatewayManagementApiMock.Setup(a => a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(new PostToConnectionResponse());
-            _amazonApiGatewayManagementApiMock.Setup(a => a.PostToConnectionAsync(It.Is<PostToConnectionRequest>(q => q.ConnectionId == "connection4"), It.IsAny<CancellationToken>())).ThrowsAsync(new GoneException("Gone")
-            {
-                StatusCode = HttpStatusCode.Gone
-            });
-
-            // Act
-            var response = await _sendMessageHandler.Handler(sqsEvent, new Mock<ILambdaContext>().Object);
-
-            // Assert
-            Assert.NotNull(response);
-            Assert.Empty(response.BatchItemFailures);
-
-            _amazonApiGatewayManagementApiMock.Verify(a =>
-                a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(4));
-            _userConnectionRepositoryMock.Verify(q => q.DeleteAsync(It.Is<UserConnection>(q => q.ConnectionId == "connection4" && q.UserId == "user3"), It.IsAny<CancellationToken>()), Times.Once);
-        }
-        
-        [Fact]
-        public async Task Should_Ignore_When_MessageDomain_Not_Deserialize()
-        {
-            var message1 = new MessageDomain {UserId = "user1", Body = "Message 1"};
-            var message3 = new MessageDomain {UserId = "user3", Body = "Message 3"};
-
-            var sqsEvent = new SQSEvent
-            {
-                Records = new List<SQSEvent.SQSMessage>
-                {
-                    new() {Body = JsonSerializer.Serialize(message1)},
-                    new() {Body = JsonSerializer.Serialize("message2")},
-                    new() {Body = JsonSerializer.Serialize(message3)}
-                }
-            };
-
-            var connection1 = new UserConnection {UserId = "user1", ConnectionId = "connection1"};
-            var connection2 = new UserConnection {UserId = "user1", ConnectionId = "connection2"};
-            var connection3 = new UserConnection {UserId = "user2", ConnectionId = "connection3"};
-            var connection4 = new UserConnection {UserId = "user3", ConnectionId = "connection4"};
-
-            _userConnectionRepositoryMock.Setup(q => q.DeleteAsync(It.Is<UserConnection>(q => q.ConnectionId == "connection4"), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user1", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection1, connection2});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user2", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection3});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user3", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection4});
-
-            _amazonApiGatewayManagementApiMock.Setup(a => a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(new PostToConnectionResponse());
-            _amazonApiGatewayManagementApiMock.Setup(a => a.PostToConnectionAsync(It.Is<PostToConnectionRequest>(q => q.ConnectionId == "connection4"), It.IsAny<CancellationToken>())).ThrowsAsync(new GoneException("Gone")
-            {
-                StatusCode = HttpStatusCode.Gone
-            });
-
-            // Act
-            var response = await _sendMessageHandler.Handler(sqsEvent, new Mock<ILambdaContext>().Object);
-
-            // Assert
-            Assert.NotNull(response);
-            Assert.Empty(response.BatchItemFailures);
-
-            _amazonApiGatewayManagementApiMock.Verify(a =>
-                a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
-            _userConnectionRepositoryMock.Verify(q => q.DeleteAsync(It.Is<UserConnection>(q => q.ConnectionId == "connection4" && q.UserId == "user3"), It.IsAny<CancellationToken>()), Times.Once);
-        }
-        
-        
-              
-        [Fact]
-        public async Task Should_Ignore_When_There_Is_No_Connection_Id()
-        {
-            var message1 = new MessageDomain {UserId = "user1", Body = "Message 1"};
-            var message3 = new MessageDomain {UserId = "user3", Body = "Message 3"};
-
-            var sqsEvent = new SQSEvent
-            {
-                Records = new List<SQSEvent.SQSMessage>
-                {
-                    new() {Body = JsonSerializer.Serialize(message1)},
-                    new() {Body = JsonSerializer.Serialize(message3)}
-                }
-            };
-
-            var connection1 = new UserConnection {UserId = "user1", ConnectionId = "connection1"};
-            var connection2 = new UserConnection {UserId = "user1", ConnectionId = "connection2"};
-            var connection3 = new UserConnection {UserId = "user2", ConnectionId = "connection3"};
-
-            _userConnectionRepositoryMock.Setup(q => q.DeleteAsync(It.Is<UserConnection>(q => q.ConnectionId == "connection4"), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user1", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection1, connection2});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user2", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection> {connection3});
-            _userConnectionRepositoryMock.Setup(r => r.GetAsync("user3", It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserConnection>());
+            _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(It.IsAny<string>(),CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(),CancellationToken.None), Times.Never);
             
+            _amazonApiGatewayManagementApiMock.Verify(api =>
+                api.PostToConnectionAsync(It.Is<PostToConnectionRequest>(req =>
+                    req.ConnectionId == connectionId1 && req.Data.ToArray().SequenceEqual(Encoding.UTF8.GetBytes(messageBody)))
+                ,CancellationToken.None), Times.Once);
+            
+            _amazonApiGatewayManagementApiMock.Verify(api =>
+                api.PostToConnectionAsync(It.Is<PostToConnectionRequest>(req =>
+                    req.ConnectionId == connectionId2 && req.Data.ToArray().SequenceEqual(Encoding.UTF8.GetBytes(messageBody)))
+                ,CancellationToken.None), Times.Once);
 
-            _amazonApiGatewayManagementApiMock.Setup(a => a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(new PostToConnectionResponse());
+        }
+
+        [Fact]
+        public async Task Handler_ValidMessageWithNoUserConnections_IgnoresMessage()
+        {
+            // Arrange
+            var userId = "user1";
+            var messageBody = "Test message";
+            var message = new SQSEvent.SQSMessage
+            {
+                Body = JsonSerializer.Serialize(new MessageDomain
+                {
+                    UserId = userId,
+                    Body = messageBody
+                })
+            };
+            var context = new Mock<ILambdaContext>();
+
+            var userConnection = new UserConnection
+            {
+                UserId = userId,
+                Connections = new List<UserConnection.ConnectionInfo>()
+            };
+
+            _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId,CancellationToken.None)).ReturnsAsync(userConnection);
 
             // Act
-            var response = await _sendMessageHandler.Handler(sqsEvent, new Mock<ILambdaContext>().Object);
+            var response = await _handler.Handler(new SQSEvent { Records = new List<SQSEvent.SQSMessage> { message } }, context.Object);
 
             // Assert
-            Assert.NotNull(response);
-            Assert.Empty(response.BatchItemFailures);
+            _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(It.IsAny<string>(),CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(),CancellationToken.None), Times.Never);
+            _amazonApiGatewayManagementApiMock.Verify(api =>
+                api.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(),CancellationToken.None), Times.Never);
 
-            _amazonApiGatewayManagementApiMock.Verify(a =>
-                a.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-            
+        }
+
+        [Fact]
+        public async Task Handler_InvalidMessage_IgnoresMessage()
+        {
+            // Arrange
+            var message = new SQSEvent.SQSMessage
+            {
+                Body = "Invalid message"
+            };
+            var context = new Mock<ILambdaContext>();
+
+            // Act
+            var response = await _handler.Handler(new SQSEvent { Records = new List<SQSEvent.SQSMessage> { message } }, context.Object);
+
+            // Assert
+            _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(It.IsAny<string>(),CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(),CancellationToken.None), Times.Never);
+            _amazonApiGatewayManagementApiMock.Verify(api =>
+                api.PostToConnectionAsync(It.IsAny<PostToConnectionRequest>(),CancellationToken.None), Times.Never);
+
         }
         
         [Fact]

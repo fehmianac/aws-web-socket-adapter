@@ -12,59 +12,154 @@ namespace Adapter.Tests.Handler
     public class OnDisconnectHandlerTests
     {
         private readonly Mock<IUserConnectionRepository> _userConnectionRepositoryMock;
-        private readonly OnDisconnectHandler _onDisconnectHandler;
+        private readonly OnDisconnectHandler _handler;
 
         public OnDisconnectHandlerTests()
         {
             _userConnectionRepositoryMock = new Mock<IUserConnectionRepository>();
-            _onDisconnectHandler = new OnDisconnectHandler(_userConnectionRepositoryMock.Object);
+            _handler = new OnDisconnectHandler(_userConnectionRepositoryMock.Object);
         }
 
         [Fact]
-        public async Task Handler_Should_Return_BadRequest_Response_When_UserId_Is_NullOrEmpty()
+        public async Task Handler_ValidUserIdWithExistingConnections_RemovesConnectionAndUpdateUserConnection()
         {
             // Arrange
-            var request = new APIGatewayProxyRequest();
-            var context = new Mock<ILambdaContext>().Object;
-
-            // Act
-            var response = await _onDisconnectHandler.Handler(request, context);
-
-            // Assert
-            Assert.Equal((int)HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Equal("invalid authorization", response.Body);
-            _userConnectionRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<UserConnection>(),It.IsAny<CancellationToken>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task Handler_Should_Delete_UserConnection_And_Return_OK_Response_When_UserId_Is_Valid()
-        {
-            // Arrange
-            var userId = "123";
-            var connectionId = "456";
+            var userId = "user1";
+            var connectionId = "connection1";
             var request = new APIGatewayProxyRequest
             {
                 RequestContext = new APIGatewayProxyRequest.ProxyRequestContext
                 {
+                    Authorizer = new APIGatewayCustomAuthorizerContext{{"userId", userId}},
                     ConnectionId = connectionId
                 }
             };
-            request.RequestContext.Authorizer = new APIGatewayCustomAuthorizerContext()
-{
-                {"userId", userId}
+            var context = new Mock<ILambdaContext>();
+
+            var userConnection = new UserConnection
+            {
+                UserId = userId,
+                Connections = new List<UserConnection.ConnectionInfo>
+                {
+                    new UserConnection.ConnectionInfo
+                    {
+                        Id = connectionId,
+                        Time = DateTime.UtcNow
+                    },
+                    new UserConnection.ConnectionInfo
+                    {
+                        Id = "connection2",
+                        Time = DateTime.UtcNow
+                    }
+                }
             };
-            var context = new Mock<ILambdaContext>().Object;
+
+            _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId, CancellationToken.None)).ReturnsAsync(userConnection);
 
             // Act
-            var response = await _onDisconnectHandler.Handler(request, context);
+            var response = await _handler.Handler(request, context.Object);
 
             // Assert
-            Assert.Equal((int)HttpStatusCode.OK, response.StatusCode);
-            Assert.Equal("Connected", response.Body);
-            _userConnectionRepositoryMock.Verify(r => r.DeleteAsync(
-                It.Is<UserConnection>(uc => uc.UserId == userId && uc.ConnectionId == connectionId),It.IsAny<CancellationToken>()), Times.Once);
+            _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(userId, CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveLastActivityAsync(userId, CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(userConnection, CancellationToken.None), Times.Once);
+
+            Assert.Equal("Disconnected", response.Body);
+            Assert.Equal((int) HttpStatusCode.OK, response.StatusCode);
+            Assert.Single(userConnection.Connections);
+            Assert.Equal("connection2", userConnection.Connections[0].Id);
         }
+
+        [Fact]
+        public async Task Handler_ValidUserIdWithNoConnections_DeletesUserConnectionAndUpdatesLastActivity()
+        {
+            // Arrange
+            var userId = "user1";
+            var connectionId = "connection1";
+            var request = new APIGatewayProxyRequest
+            {
+                RequestContext = new APIGatewayProxyRequest.ProxyRequestContext
+                {
+                    Authorizer = new APIGatewayCustomAuthorizerContext{{"userId", userId}},
+                    ConnectionId = connectionId
+                }
+            };
+            var context = new Mock<ILambdaContext>();
+
+            var userConnection = new UserConnection
+            {
+                UserId = userId,
+                Connections = new List<UserConnection.ConnectionInfo>
+                {
+                    new UserConnection.ConnectionInfo
+                    {
+                        Id = connectionId,
+                        Time = DateTime.UtcNow
+                    }
+                }
+            };
+
+            _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId, CancellationToken.None)).ReturnsAsync(userConnection);
+
+            // Act
+            var response = await _handler.Handler(request, context.Object);
+
+            // Assert
+            _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(userId, CancellationToken.None), Times.Once);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveLastActivityAsync(userId, CancellationToken.None), Times.Once);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(), CancellationToken.None), Times.Never);
+
+            Assert.Equal("Disconnected", response.Body);
+            Assert.Equal((int) HttpStatusCode.OK, response.StatusCode);
+            Assert.Empty(userConnection.Connections);
+        }
+
+        [Fact]
+        public async Task Handler_InvalidUserId_ReturnsBadRequestResponse()
+        {
+            // Arrange
+            var request = new APIGatewayProxyRequest();
+            var context = new Mock<ILambdaContext>();
+
+            // Act
+            var response = await _handler.Handler(request, context.Object);
+
+            // Assert
+            _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveLastActivityAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
+            _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(), CancellationToken.None), Times.Never);
+
+            Assert.Equal("invalid authorization", response.Body);
+            Assert.Equal((int) HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
         
+        
+        [Fact]
+        public async Task Handler_ThereIsNoConnectionForUser_ReturnOkResponse()
+        {
+            // Arrange
+            var request = new APIGatewayProxyRequest
+            {
+                RequestContext = new APIGatewayProxyRequest.ProxyRequestContext
+                {
+                    Authorizer = new APIGatewayCustomAuthorizerContext
+                    {
+                        {"userId", "user1"}
+                    }
+                }
+            };
+            var context = new Mock<ILambdaContext>();
+
+            _userConnectionRepositoryMock.Setup(q=> q.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((UserConnection)null);
+            // Act
+            var response = await _handler.Handler(request, context.Object);
+
+
+            Assert.Equal("Disconnected", response.Body);
+            Assert.Equal((int) HttpStatusCode.OK, response.StatusCode);
+        }
+
         [Fact]
         public async Task Should_Valid_Default_Ctor()
         {

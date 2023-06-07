@@ -39,7 +39,7 @@ public class OnDisconnectHandler
         {
             return new APIGatewayProxyResponse
             {
-                Body = "Connected",
+                Body = "Disconnected",
                 StatusCode = (int) HttpStatusCode.OK
             };
         }
@@ -57,7 +57,7 @@ public class OnDisconnectHandler
 
         return new APIGatewayProxyResponse
         {
-            Body = "Connected",
+            Body = "Disconnected",
             StatusCode = (int) HttpStatusCode.OK
         };
     }

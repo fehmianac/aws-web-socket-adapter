@@ -30,26 +30,27 @@ public class UserConnectionRepository : IUserConnectionRepository
                 {":sk", new AttributeValue {S = userId}}
             },
         };
-        
+
         var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
-            
+
         if (!response.Items.Any())
         {
             return null;
         }
+
         var item = response.Items.FirstOrDefault();
         if (item == null)
         {
             return null;
         }
-            
+
         return new UserConnection
         {
             UserId = item["sk"].S,
             Connections = item["connections"].L.Select(q => new UserConnection.ConnectionInfo
             {
                 Id = q.M["id"].S,
-                Time = DateTime.Parse(q.M["time"].S)
+                Time = ParseDateTime(q.M["time"].S)
             }).ToList()
         };
     }
@@ -184,7 +185,13 @@ public class UserConnectionRepository : IUserConnectionRepository
         return items.Select(q => new UserLastActivity
         {
             Id = q["sk"].S,
-            Time = DateTime.Parse(q["time"].S)
+            Time = ParseDateTime(q["time"].S)
         }).ToList();
+    }
+
+    private static DateTime ParseDateTime(string dateTime)
+    {
+        var date = DateTime.Parse(dateTime).ToUniversalTime();
+        return date;
     }
 }
