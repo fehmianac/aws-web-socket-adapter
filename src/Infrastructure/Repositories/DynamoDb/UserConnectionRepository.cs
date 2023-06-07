@@ -30,23 +30,31 @@ public class UserConnectionRepository : IUserConnectionRepository
             }
         };
 
-        var response = await _amazonDynamoDb.GetItemAsync(request, cancellationToken);
+        try
+        {
+            var response = await _amazonDynamoDb.GetItemAsync(request, cancellationToken);
 
-        var item = response.Item;
-        if (item == null)
+            var item = response.Item;
+            if (item == null)
+            {
+                return null;
+            }
+
+            return new UserConnection
+            {
+                UserId = item["sk"].S,
+                Connections = item["connections"].L.Select(q => new UserConnection.ConnectionInfo
+                {
+                    Id = q.M["id"].S,
+                    Time = DateTime.Parse(q.M["time"].S)
+                }).ToList()
+            };
+        }
+        catch (AmazonDynamoDBException e)
         {
             return null;
         }
-
-        return new UserConnection
-        {
-            UserId = item["sk"].S,
-            Connections = item["connections"].L.Select(q => new UserConnection.ConnectionInfo
-            {
-                Id = q.M["id"].S,
-                Time = DateTime.Parse(q.M["time"].S)
-            }).ToList()
-        };
+        
     }
 
     public async Task<bool> SaveAsync(UserConnection userConnection, CancellationToken cancellationToken = default)
