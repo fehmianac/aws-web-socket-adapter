@@ -184,7 +184,7 @@ public class UserConnectionRepository : IUserConnectionRepository
         return items.Select(q => new UserLastActivity
         {
             Id = q["sk"].S,
-            Time = DateTime.Parse(q["lastActivity"].S)
+            Time = DateTime.Parse(q["time"].S)
         }).ToList();
     }
 }
