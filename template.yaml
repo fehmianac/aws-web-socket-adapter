@@ -23,7 +23,7 @@ Parameters:
     Type: String
     Default: 'fdre4t5y6u7i8o9p0o9i8u7y6t5r4e3w2q1'
     Description: (Required) The secret used to sign the JWT token. Minimum 30 characters
-    
+
 Resources:
   WebSocketAdaptor:
     Type: AWS::ApiGatewayV2::Api
@@ -39,9 +39,9 @@ Resources:
       ApiId: !Ref WebSocketAdaptor
       
       AuthorizerType: REQUEST
-      AuthorizerUri: 
+      AuthorizerUri:
         Fn::Sub:
-            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
       IdentitySource:
         - route.request.querystring.Authorization
 
@@ -64,9 +64,9 @@ Resources:
       ApiId: !Ref WebSocketAdaptor
       Description: Connect Integration
       IntegrationType: AWS_PROXY
-      IntegrationUri: 
+      IntegrationUri:
         Fn::Sub:
-            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
 
   DisconnectRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -85,15 +85,15 @@ Resources:
       ApiId: !Ref WebSocketAdaptor
       Description: Disconnect Integration
       IntegrationType: AWS_PROXY
-      IntegrationUri: 
+      IntegrationUri:
         Fn::Sub:
-            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
 
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-    - ConnectRoute
-    - DisconnectRoute
+      - ConnectRoute
+      - DisconnectRoute
     Properties:
       ApiId: !Ref WebSocketAdaptor
   Stage:
@@ -108,15 +108,15 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: "pk"
-        AttributeType: "S"
-      - AttributeName: "sk"
-        AttributeType: "S"
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "sk"
+          AttributeType: "S"
       KeySchema:
-      - AttributeName: "pk"
-        KeyType: "HASH"
-      - AttributeName: "sk"
-        KeyType: "RANGE"
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "sk"
+          KeyType: "RANGE"
       BillingMode:
         PAY_PER_REQUEST
       SSESpecification:
@@ -127,7 +127,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: WebSocketAdaptorOnConnectFunction
-      CodeUri: 
+      CodeUri:
         Bucket: !Ref CodeBucketName
         Key: onconnect.zip
       Handler: Adapter::Adapter.Handler.OnConnectHandler::Handler
@@ -139,8 +139,8 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
       Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
 
   OnConnectPermission:
     Type: AWS::Lambda::Permission
@@ -157,40 +157,40 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action:
-          - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
         - PolicyName: allowLambdaLogs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - logs:*
-              Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:*
         - PolicyName: OnConnectDynamoDbPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - dynamodb:PutItem
-              - dynamodb:DeleteItem
-              - dynamodb:Query
-              Resource: !GetAtt ConnectionsTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !GetAtt ConnectionsTable.Arn
 
   OnDisconnectFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: WebSocketAdaptorOnDisconnectFunction
-      CodeUri: 
+      CodeUri:
         Bucket: !Ref CodeBucketName
         Key: ondisconnect.zip
-      Handler:  Adapter::Adapter.Handler.OnDisconnectHandler::Handler
+      Handler: Adapter::Adapter.Handler.OnDisconnectHandler::Handler
       Role: !GetAtt OnDisconnectFunctionLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 180
@@ -199,8 +199,8 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
       Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
 
   OnDisconnectPermission:
     Type: AWS::Lambda::Permission
@@ -217,35 +217,35 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action:
-          - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
         - PolicyName: allowLambdaLogs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - logs:*
-              Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:*
         - PolicyName: OnDisconnectDynamoDBPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - dynamodb:DeleteItem
-              - dynamodb:Query
-              Resource: !GetAtt ConnectionsTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !GetAtt ConnectionsTable.Arn
   AuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: WebSocketAdaptorAuthorizerFunction
-      CodeUri: 
+      CodeUri:
         Bucket: !Ref CodeBucketName
         Key: ondisconnect.zip
       Handler: Adapter::Adapter.Handler.AuthorizerHandler::Handler
@@ -257,8 +257,8 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
       Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
 
   AuthorizerFunctionLambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -266,35 +266,35 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action:
-          - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
         - PolicyName: allowLambdaLogs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - logs:*
-              Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:*
         - PolicyName: allowParameterStore
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - ssm:GetParameter
-              Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: '*'
 
   SendMessageFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: WebSocketAdaptorSendMessageFunction
-      CodeUri: 
+      CodeUri:
         Bucket: !Ref CodeBucketName
         Key: sendmessage.zip
       Handler: Adapter::Adapter.Handler.SendMessageHandler::Handler
@@ -307,14 +307,14 @@ Resources:
           TABLE_NAME: !Ref TableName
           API_GATEWAY_ENDPOINT: !Sub 'https://${WebSocketAdaptor}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
       Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
-      - Statement:
-        - Effect: Allow
-          Action:
-          - 'execute-api:ManageConnections'
-          Resource:
-          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketAdaptor}/*'
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - 'execute-api:ManageConnections'
+              Resource:
+                - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketAdaptor}/*'
 
   SendMessageLambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -322,51 +322,51 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action:
-          - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
         - PolicyName: allowLambdaLogs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - logs:*
-              Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:*
         - PolicyName: allowSqs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - sqs:ReceiveMessage
-              - sqs:DeleteMessage
-              - sqs:GetQueueAttributes
-              - sqs:ChangeMessageVisibility
-              Resource: !GetAtt SendMessageSQS.Arn
-              
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:ChangeMessageVisibility
+                Resource: !GetAtt SendMessageSQS.Arn
+
         - PolicyName: SendMessageDynamoDBPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - dynamodb:DeleteItem
-              - dynamodb:Query
-              Resource: !GetAtt ConnectionsTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !GetAtt ConnectionsTable.Arn
         - PolicyName: ApiGatewayManageConnection
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - 'execute-api:ManageConnections'
-              Resource:
-              - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketAdaptor}/*'
+              - Effect: Allow
+                Action:
+                  - 'execute-api:ManageConnections'
+                Resource:
+                  - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketAdaptor}/*'
 
   SendMessageFunctionEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -404,11 +404,11 @@ Resources:
   SendMessageQueueUrlParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /WebSocketAdapter/SendMessageQueueUrl 
+      Name: /WebSocketAdapter/SendMessageQueueUrl
       Type: String
       Value: !GetAtt SendMessageSQS.QueueUrl
       Description: Message queue URL for SendMessage function
-    DependsOn: 
+    DependsOn:
       - SendMessageSQS
 
 
@@ -418,97 +418,14 @@ Resources:
       Name: aws-websockets-adaptor-rest-api
       ProtocolType: HTTP
 
-  IsOnlineFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: WebSocketAdaptorRestIsOnlineFunction
-      CodeUri: 
-        Bucket: !Ref CodeBucketName
-        Key: ondisconnect.zip
-      Handler:  Adapter::Adapter.Handler.RestApi.IsOnlineHandler::Handler
-      Role: !GetAtt IsOnlineFunctionLambdaExecutionRole.Arn
-      MemorySize: 512
-      Timeout: 180
-      Runtime: dotnet6
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TableName
-      Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
-
-  IsOnlineFunctionPermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - WebSocketAdaptorRestApi
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref IsOnlineFunction
-      Principal: apigateway.amazonaws.com
-
-  IsOnlineFunctionLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action:
-          - sts:AssumeRole
-      Policies:
-        - PolicyName: allowLambdaLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-            - Effect: Allow
-              Action:
-              - logs:*
-              Resource: arn:aws:logs:*:*:*
-        - PolicyName: IsOnlineFunctionDynamoDBPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-            - Effect: Allow
-              Action:
-              - dynamodb:Query
-              - dynamoDb:GetItem
-              Resource: !GetAtt ConnectionsTable.Arn
-
-  IsOnlineRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketAdaptorRestApi
-      RouteKey: 'GET /user/{userId}/online'
-      AuthorizationType: NONE
-      OperationName: IsOnlineRoute
-      Target: !Join
-        - '/'
-        - - 'integrations'
-          - !Ref IsOnlineRouteInteg
-
-  IsOnlineRouteInteg:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketAdaptorRestApi
-      PayloadFormatVersion: '2.0'
-      Description: Disconnect Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri: 
-        Fn::Sub:
-            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${IsOnlineFunction.Arn}/invocations
-
-
   OnlineListFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: WebSocketAdaptorRestOnlineListFunction
-      CodeUri: 
+      CodeUri:
         Bucket: !Ref CodeBucketName
         Key: ondisconnect.zip
-      Handler:  Adapter::Adapter.Handler.RestApi.OnlineListHandler::Handler
+      Handler: Adapter::Adapter.Handler.RestApi.OnlineListHandler::Handler
       Role: !GetAtt OnlineListFunctionLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 180
@@ -517,8 +434,8 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
       Policies:
-      - DynamoDBCrudPolicy:
-          TableName: !Ref TableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
 
   OnlineListFunctionPermission:
     Type: AWS::Lambda::Permission
@@ -535,30 +452,30 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action:
-          - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
         - PolicyName: allowLambdaLogs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - logs:*
-              Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:*
         - PolicyName: IsOnlineFunctionDynamoDBPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-            - Effect: Allow
-              Action:
-              - dynamodb:Query
-              - dynamoDb:GetItem
-              Resource: !GetAtt ConnectionsTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamoDb:GetItem
+                Resource: !GetAtt ConnectionsTable.Arn
 
   OnlineListRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -579,15 +496,15 @@ Resources:
       PayloadFormatVersion: '2.0'
       Description: OnlineListRouteInteg Integration
       IntegrationType: AWS_PROXY
-      IntegrationUri: 
+      IntegrationUri:
         Fn::Sub:
-            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnlineListFunction.Arn}/invocations
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnlineListFunction.Arn}/invocations
 
   WebSocketAdaptorRestApiDeployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-    - IsOnlineRoute
-    - DisconnectRoute
+      - IsOnlineRoute
+      - DisconnectRoute
     Properties:
       ApiId: !Ref WebSocketAdaptorRestApi
 
@@ -619,4 +536,4 @@ Outputs:
 
   WebSocketURI:
     Description: "The WSS Protocol URI to connect to"
-    Value: !Join [ '', [ 'wss://', !Ref WebSocketAdaptor, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref 'Stage'] ]
+    Value: !Join [ '', [ 'wss://', !Ref WebSocketAdaptor, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref 'Stage' ] ]

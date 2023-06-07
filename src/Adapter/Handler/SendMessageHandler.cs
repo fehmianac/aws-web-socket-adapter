@@ -7,7 +7,6 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Amazon.Runtime;
 using Domain.Domain;
-using Domain.Entities;
 using Domain.Repositories;
 using Infrastructure.Factory;
 
@@ -46,18 +45,34 @@ public class SendMessageHandler
                 continue;
             }
 
-            var connectionIds = await _userConnectionRepository.GetAsync(messageDomain.UserId);
-            if (!connectionIds.Any())
+            var userConnection = await _userConnectionRepository.GetAsync(messageDomain.UserId);
+            if (userConnection == null || !userConnection.Connections.Any())
             {
                 continue;
             }
 
-            Console.WriteLine("connectionIds: " + JsonSerializer.Serialize(connectionIds));
+            var userConnectionModified = false;
 
             var stream = new MemoryStream(Encoding.UTF8.GetBytes(messageDomain.Body));
-            foreach (var connection in connectionIds)
+            foreach (var connection in userConnection.Connections)
             {
-                await SendMessageToConnection(connection.UserId, connection.ConnectionId, stream);
+                var sendMessageResponse = await SendMessageToConnection(connection.Id, stream);
+                if (sendMessageResponse)
+                {
+                    continue;
+                }
+
+                userConnection.Connections.RemoveAll(q => q.Id == connection.Id);
+                userConnectionModified = true;
+            }
+
+            if (!userConnection.Connections.Any())
+            {
+                await _userConnectionRepository.DeleteAsync(messageDomain.UserId);
+            }
+            else if (userConnectionModified)
+            {
+                await _userConnectionRepository.SaveAsync(userConnection);
             }
         }
 
@@ -65,35 +80,26 @@ public class SendMessageHandler
         return response;
     }
 
-    private async Task SendMessageToConnection(string userId, string connectionId, MemoryStream body)
+    private async Task<bool> SendMessageToConnection(string connectionId, MemoryStream body)
     {
         try
         {
-            Console.WriteLine("SendMessageToConnection: " + connectionId + " - " + userId + " - " + body.Length + " bytes");
             await _amazonApiGatewayManagementApi.PostToConnectionAsync(new PostToConnectionRequest
             {
                 ConnectionId = connectionId,
                 Data = body
             });
-            Console.WriteLine("SendMessageToConnection: " + connectionId + " - " + userId + " - " + body.Length + " bytes - success");
+            return true;
         }
         catch (AmazonServiceException e)
         {
-            Console.WriteLine(e.Message);
             if (e.StatusCode == HttpStatusCode.Gone)
             {
-                await _userConnectionRepository.DeleteAsync(new UserConnection
-                {
-                    UserId = userId,
-                    ConnectionId = connectionId
-                });
-
-                await _userConnectionRepository.DeleteAsync(new OnlineStatus
-                {
-                    UserId = userId
-                });
+                return false;
             }
         }
+
+        return true;
     }
 
     private static MessageDomain? JsonDeserialize(string body)

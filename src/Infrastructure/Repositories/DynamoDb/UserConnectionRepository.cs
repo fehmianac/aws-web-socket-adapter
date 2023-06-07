@@ -8,7 +8,9 @@ namespace Infrastructure.Repositories.DynamoDb;
 
 public class UserConnectionRepository : IUserConnectionRepository
 {
-    private string TableName = Environment.GetEnvironmentVariable("TABLE_NAME") ?? "web_socket_adapter_table";
+    private readonly string _tableName = Environment.GetEnvironmentVariable("TABLE_NAME") ?? "web_socket_adapter_table";
+    private const string UserConnectionPk = "userConnections";
+    private const string LastActivityPk = "lastActivity";
     private readonly IAmazonDynamoDB _amazonDynamoDb;
 
     public UserConnectionRepository(IAmazonDynamoDB amazonDynamoDb)
@@ -16,146 +18,168 @@ public class UserConnectionRepository : IUserConnectionRepository
         _amazonDynamoDb = amazonDynamoDb;
     }
 
-    public async Task<List<UserConnection>> GetAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<UserConnection?> GetAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var request = new QueryRequest
+        var request = new GetItemRequest()
         {
-            TableName = TableName,
-            KeyConditionExpression = "pk = :pk",
-            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+            TableName = _tableName,
+            Key = new Dictionary<string, AttributeValue>
             {
-                {":pk", new AttributeValue {S = userId}}
+                {":pk", new AttributeValue {S = UserConnectionPk}},
+                {":sk", new AttributeValue {S = userId}}
             }
         };
 
-        var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
+        var response = await _amazonDynamoDb.GetItemAsync(request, cancellationToken);
 
-        var userConnections = new List<UserConnection>();
-        foreach (var item in response.Items)
+        var item = response.Item;
+        if (item == null)
         {
-            userConnections.Add(new UserConnection
-            {
-                UserId = item["pk"].S,
-                ConnectionId = item["sk"].S
-            });
+            return null;
         }
 
-        return userConnections;
+        return new UserConnection
+        {
+            UserId = item["sk"].S,
+            Connections = item["connections"].L.Select(q => new UserConnection.ConnectionInfo
+            {
+                Id = q.M["id"].S,
+                Time = DateTime.Parse(q.M["time"].S)
+            }).ToList()
+        };
     }
 
     public async Task<bool> SaveAsync(UserConnection userConnection, CancellationToken cancellationToken = default)
     {
         var request = new PutItemRequest
         {
-            TableName = TableName,
+            TableName = _tableName,
             Item = new Dictionary<string, AttributeValue>
             {
-                {"pk", new AttributeValue {S = userConnection.UserId}},
-                {"sk", new AttributeValue {S = userConnection.ConnectionId}}
-            }
-        };
-
-        var response = await _amazonDynamoDb.PutItemAsync(request, cancellationToken);
-
-        return response.HttpStatusCode == HttpStatusCode.OK;
-    }
-
-    public async Task<bool> DeleteAsync(UserConnection userConnection, CancellationToken cancellationToken = default)
-    {
-        var request = new DeleteItemRequest
-        {
-            TableName = TableName,
-            Key = new Dictionary<string, AttributeValue>
-            {
-                {"pk", new AttributeValue {S = userConnection.UserId}},
-                {"sk", new AttributeValue {S = userConnection.ConnectionId}}
-            }
-        };
-        var response = await _amazonDynamoDb.DeleteItemAsync(request, cancellationToken);
-        return response.HttpStatusCode == HttpStatusCode.OK;
-    }
-
-    public async Task<bool> SaveAsync(OnlineStatus userConnection, CancellationToken cancellationToken = default)
-    {
-        var request = new PutItemRequest
-        {
-            TableName = TableName,
-            Item = new Dictionary<string, AttributeValue>
-            {
-                {"pk", new AttributeValue {S = "userOnlineStatus"}},
+                {"pk", new AttributeValue {S = UserConnectionPk}},
                 {"sk", new AttributeValue {S = userConnection.UserId}},
-                {"connectedDate", new AttributeValue {S = userConnection.ConnectedDate.ToString("O")}}
+                {
+                    "connections", new AttributeValue
+                    {
+                        L = userConnection.Connections.Select(q => new AttributeValue
+                        {
+                            M = new Dictionary<string, AttributeValue>
+                            {
+                                {"id", new AttributeValue {S = q.Id}},
+                                {"time", new AttributeValue {S = q.Time.ToString("O")}}
+                            }
+                        }).ToList()
+                    }
+                },
             }
         };
 
         var response = await _amazonDynamoDb.PutItemAsync(request, cancellationToken);
-
         return response.HttpStatusCode == HttpStatusCode.OK;
     }
 
-    public async Task<bool> DeleteAsync(OnlineStatus userConnection, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(string userId, CancellationToken cancellationToken = default)
     {
         var request = new DeleteItemRequest
         {
-            TableName = TableName,
+            TableName = _tableName,
             Key = new Dictionary<string, AttributeValue>
             {
-                {"pk", new AttributeValue {S = "userOnlineStatus"}},
-                {"sk", new AttributeValue {S = userConnection.UserId}}
+                {"pk", new AttributeValue {S = UserConnectionPk}},
+                {"sk", new AttributeValue {S = userId}}
             }
         };
         var response = await _amazonDynamoDb.DeleteItemAsync(request, cancellationToken);
         return response.HttpStatusCode == HttpStatusCode.OK;
     }
 
-    public async Task<bool> GetOnlineStatusAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<List<string>> GetOnlineListAsync(List<string> userIds, CancellationToken cancellationToken = default)
     {
-        var request = new GetItemRequest()
+        if (!userIds.Any())
         {
-            TableName = TableName,
-            Key = new Dictionary<string, AttributeValue>
-            {
-                {"pk", new AttributeValue {S = "userOnlineStatus"}},
-                {"sk", new AttributeValue {S = userId}},
-            }
-        };
+            return new List<string>();
+        }
 
-        var response = await _amazonDynamoDb.GetItemAsync(request, cancellationToken);
-        return response.HttpStatusCode == HttpStatusCode.OK && response.Item.Count > 0;
+        var batchGetItemResponse = await _amazonDynamoDb.BatchGetItemAsync(new BatchGetItemRequest()
+        {
+            RequestItems = new Dictionary<string, KeysAndAttributes>
+            {
+                {
+                    "requestedKeys", new KeysAndAttributes
+                    {
+                        Keys = userIds.Select(q => new Dictionary<string, AttributeValue>
+                        {
+                            {"pk", new AttributeValue {S = UserConnectionPk}},
+                            {"sk", new AttributeValue {S = q}}
+                        }).ToList(),
+                        ProjectionExpression = "sk"
+                    }
+                }
+            }
+        }, cancellationToken);
+        var items = batchGetItemResponse.Responses["requestedKeys"];
+        return items.Select(q => q["sk"].S).ToList();
     }
 
-    public async Task<List<OnlineStatus>> GetOnlineStatusesAsync(CancellationToken cancellationToken = default)
+    public async Task<List<string>> GetOnlineListAsync(CancellationToken cancellationToken = default)
     {
-        var request = new QueryRequest
+        var queryResponse = await _amazonDynamoDb.QueryAsync(new QueryRequest
         {
-            TableName = TableName,
+            TableName = _tableName,
             KeyConditionExpression = "pk = :pk",
             ExpressionAttributeValues = new Dictionary<string, AttributeValue>
             {
-                {":pk", new AttributeValue {S = "userOnlineStatus"}}
+                {":pk", new AttributeValue {S = UserConnectionPk}}
             },
-            ExclusiveStartKey = new Dictionary<string, AttributeValue>()
+        }, cancellationToken);
+        return queryResponse.Items.Select(q => q["sk"].S).ToList();
+    }
+
+    public async Task<bool> SaveLastActivityAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var request = new PutItemRequest
+        {
+            TableName = _tableName,
+            Item = new Dictionary<string, AttributeValue>
+            {
+                {"pk", new AttributeValue {S = LastActivityPk}},
+                {"sk", new AttributeValue {S = userId}},
+                {"time", new AttributeValue {S = DateTime.UtcNow.ToString("O")}},
+            }
         };
 
-        var userOnlineStatus = new List<OnlineStatus>();
-        do
+        var response = await _amazonDynamoDb.PutItemAsync(request, cancellationToken);
+
+        return response.HttpStatusCode == HttpStatusCode.OK;
+    }
+
+    public async Task<List<UserLastActivity>> GetLastActivityAsync(List<string> userIds, CancellationToken cancellationToken = default)
+    {
+        if (!userIds.Any())
+            return new List<UserLastActivity>();
+
+        var batchGetItemResponse = await _amazonDynamoDb.BatchGetItemAsync(new BatchGetItemRequest()
         {
-            var response = await _amazonDynamoDb.QueryAsync(request, cancellationToken);
-            if (!response.Items.Any())
-                break;
-            
-            foreach (var item in response.Items)
+            RequestItems = new Dictionary<string, KeysAndAttributes>
             {
-                userOnlineStatus.Add(new OnlineStatus
                 {
-                    UserId = item["sk"].S,
-                    ConnectedDate = DateTime.Parse(item["connectedDate"].S)
-                });
+                    "requestedKeys", new KeysAndAttributes
+                    {
+                        Keys = userIds.Select(q => new Dictionary<string, AttributeValue>
+                        {
+                            {"pk", new AttributeValue {S = LastActivityPk}},
+                            {"sk", new AttributeValue {S = q}}
+                        }).ToList()
+                    }
+                }
             }
+        }, cancellationToken);
 
-            request.ExclusiveStartKey = response.LastEvaluatedKey;
-        } while (request.ExclusiveStartKey.Count > 0);
-
-        return userOnlineStatus;
+        var items = batchGetItemResponse.Responses["requestedKeys"];
+        return items.Select(q => new UserLastActivity
+        {
+            Id = q["sk"].S,
+            Time = DateTime.Parse(q["lastActivity"].S)
+        }).ToList();
     }
 }

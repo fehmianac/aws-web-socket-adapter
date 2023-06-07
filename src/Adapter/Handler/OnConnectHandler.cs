@@ -34,17 +34,18 @@ public class OnConnectHandler
             };
         }
 
-        await _userConnectionRepository.SaveAsync(new UserConnection
-        {
-            ConnectionId = request.RequestContext.ConnectionId,
-            UserId = userId
-        });
-
-        await _userConnectionRepository.SaveAsync(new OnlineStatus
+        var userConnection = await _userConnectionRepository.GetAsync(userId) ?? new UserConnection
         {
             UserId = userId,
-            ConnectedDate = DateTime.UtcNow
+            Connections = new List<UserConnection.ConnectionInfo>()
+        };
+
+        userConnection.Connections.Add(new UserConnection.ConnectionInfo
+        {
+            Id = request.RequestContext.ConnectionId,
+            Time = DateTime.UtcNow
         });
+        await _userConnectionRepository.SaveAsync(userConnection);
 
         return new APIGatewayProxyResponse
         {

@@ -34,16 +34,26 @@ public class OnDisconnectHandler
             };
         }
 
-        await _userConnectionRepository.DeleteAsync(new UserConnection
+        var userConnection = await _userConnectionRepository.GetAsync(userId);
+        if (userConnection == null)
         {
-            ConnectionId = request.RequestContext.ConnectionId,
-            UserId = userId
-        });
+            return new APIGatewayProxyResponse
+            {
+                Body = "Connected",
+                StatusCode = (int) HttpStatusCode.OK
+            };
+        }
 
-        await _userConnectionRepository.DeleteAsync(new OnlineStatus
+        userConnection.Connections.RemoveAll(x => x.Id == request.RequestContext.ConnectionId);
+        if (userConnection.Connections.Any())
         {
-            UserId = userId
-        });
+            await _userConnectionRepository.SaveAsync(userConnection);
+        }
+        else
+        {
+            await _userConnectionRepository.DeleteAsync(userId);
+            //TODO put last activity
+        }
 
         return new APIGatewayProxyResponse
         {
