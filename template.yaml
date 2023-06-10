@@ -129,7 +129,7 @@ Resources:
       FunctionName: WebSocketAdaptorOnConnectFunction
       CodeUri:
         Bucket: !Ref CodeBucketName
-        Key: onconnect.zip
+        Key: deploy.zip
       Handler: Adapter::Adapter.Handler.OnConnectHandler::Handler
       Role: !GetAtt OnConnectFunctionLambdaExecutionRole.Arn
       MemorySize: 512
@@ -190,7 +190,7 @@ Resources:
       FunctionName: WebSocketAdaptorOnDisconnectFunction
       CodeUri:
         Bucket: !Ref CodeBucketName
-        Key: ondisconnect.zip
+        Key: deploy.zip
       Handler: Adapter::Adapter.Handler.OnDisconnectHandler::Handler
       Role: !GetAtt OnDisconnectFunctionLambdaExecutionRole.Arn
       MemorySize: 512
@@ -250,7 +250,7 @@ Resources:
       FunctionName: WebSocketAdaptorAuthorizerFunction
       CodeUri:
         Bucket: !Ref CodeBucketName
-        Key: ondisconnect.zip
+        Key: deploy.zip
       Handler: Adapter::Adapter.Handler.AuthorizerHandler::Handler
       Role: !GetAtt AuthorizerFunctionLambdaExecutionRole.Arn
       MemorySize: 512
@@ -299,7 +299,7 @@ Resources:
       FunctionName: WebSocketAdaptorSendMessageFunction
       CodeUri:
         Bucket: !Ref CodeBucketName
-        Key: sendmessage.zip
+        Key: deploy.zip
       Handler: Adapter::Adapter.Handler.SendMessageHandler::Handler
       Role: !GetAtt SendMessageLambdaExecutionRole.Arn
       MemorySize: 512
@@ -428,7 +428,7 @@ Resources:
       FunctionName: WebSocketAdaptorRestOnlineListFunction
       CodeUri:
         Bucket: !Ref CodeBucketName
-        Key: ondisconnect.zip
+        Key: deploy.zip
       Handler: Adapter::Adapter.Handler.RestApi.OnlineListHandler::Handler
       Role: !GetAtt OnlineListFunctionLambdaExecutionRole.Arn
       MemorySize: 512
