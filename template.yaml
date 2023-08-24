@@ -183,7 +183,23 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:GetItem
                 Resource: !GetAtt ConnectionsTable.Arn
-
+        - PolicyName: OnConnectSNSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:*
+                Resource: arn:aws:sns:*:*:*
+        - PolicyName: allowParameterStore
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: '*'                
+                
   OnDisconnectFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -244,6 +260,38 @@ Resources:
                   - dynamodb:GetItem
                   - dynamodb:PutItem
                 Resource: !GetAtt ConnectionsTable.Arn
+        - PolicyName: OnDisconnectSNSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:*
+                Resource: arn:aws:sns:*:*:*
+        - PolicyName: allowParameterStore
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: '*'
+                
+  WebSocketAdapterEventBus:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: WebSocketAdapterEventBus
+  
+
+  WebSocketAdapterEventBusParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /WebSocketAdapter/EventBusEndpoint
+      Type: String
+      Value: !Ref WebSocketAdapterEventBus
+      Description: EventBusEndpoint
+
+
   AuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -518,9 +566,9 @@ Resources:
       StageName: Prod
       Description: Prod Stage
       DeploymentId: !Ref WebSocketAdaptorRestApiDeployment
-
-
       ApiId: !Ref WebSocketAdaptorRestApi
+      
+  
 Outputs:
   ConnectionsTableArn:
     Description: "Connections table ARN"

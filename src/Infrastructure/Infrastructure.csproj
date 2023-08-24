@@ -12,6 +12,7 @@
 
     <ItemGroup>
       <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.103.12" />
+      <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.200.24" />
       <PackageReference Include="AWSSDK.SimpleSystemsManagement" Version="3.7.104.39" />
       <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.30.1" />
     </ItemGroup>

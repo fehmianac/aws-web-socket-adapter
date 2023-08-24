@@ -4,6 +4,7 @@ using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Domain.Entities;
 using Domain.Repositories;
+using Domain.Services.Contract;
 using Infrastructure.Factory;
 
 namespace Adapter.Handler;
@@ -11,15 +12,18 @@ namespace Adapter.Handler;
 public class OnDisconnectHandler
 {
     private readonly IUserConnectionRepository _userConnectionRepository;
+    private readonly IEventBusManager _eventBusManager;
 
     public OnDisconnectHandler()
     {
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
+        _eventBusManager = ServiceFactory.CreateEventBusService();
     }
 
-    public OnDisconnectHandler(IUserConnectionRepository userConnectionRepository)
+    public OnDisconnectHandler(IUserConnectionRepository userConnectionRepository, IEventBusManager eventBusManager)
     {
         _userConnectionRepository = userConnectionRepository;
+        _eventBusManager = eventBusManager;
     }
 
     public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest request, ILambdaContext context)
@@ -54,6 +58,8 @@ public class OnDisconnectHandler
             await _userConnectionRepository.DeleteAsync(userId);
             await _userConnectionRepository.SaveLastActivityAsync(userId);
         }
+
+        await _eventBusManager.OnlineStatusChanged(userId, false);
 
         return new APIGatewayProxyResponse
         {

@@ -21,4 +21,13 @@ public class AwsSecretService : ISecretService
         }, cancellationToken);
         return jwtSecretParameters.Parameter.Value;
     }
+
+    public async Task<string> GetEventBusEndpoint(CancellationToken cancellationToken = default)
+    {
+        var jwtSecretParameters = await _amazonSimpleSystemsManagement.GetParameterAsync(new GetParameterRequest
+        {
+            Name = "/WebSocketAdapter/EventBusEndpoint",
+        }, cancellationToken);
+        return jwtSecretParameters.Parameter.Value;
+    }
 }

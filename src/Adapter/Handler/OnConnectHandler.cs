@@ -5,6 +5,7 @@ using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Domain.Entities;
 using Domain.Repositories;
+using Domain.Services.Contract;
 using Infrastructure.Factory;
 
 namespace Adapter.Handler;
@@ -12,15 +13,18 @@ namespace Adapter.Handler;
 public class OnConnectHandler
 {
     private readonly IUserConnectionRepository _userConnectionRepository;
+    private readonly IEventBusManager _eventBusManager;
 
     public OnConnectHandler()
     {
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
+        _eventBusManager = ServiceFactory.CreateEventBusService();
     }
 
-    public OnConnectHandler(IUserConnectionRepository userConnectionRepository)
+    public OnConnectHandler(IUserConnectionRepository userConnectionRepository, IEventBusManager eventBusManager)
     {
         _userConnectionRepository = userConnectionRepository;
+        _eventBusManager = eventBusManager;
     }
 
     public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest request, ILambdaContext context)
@@ -48,7 +52,7 @@ public class OnConnectHandler
             Time = DateTime.UtcNow
         });
         await _userConnectionRepository.SaveAsync(userConnection);
-
+        await _eventBusManager.OnlineStatusChanged(userId, true);
         return new APIGatewayProxyResponse
         {
             Body = "Connected",

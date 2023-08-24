@@ -4,6 +4,7 @@ using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Domain.Entities;
 using Domain.Repositories;
+using Domain.Services.Contract;
 using Moq;
 using Xunit;
 
@@ -12,12 +13,14 @@ namespace Adapter.Tests.Handler
     public class OnDisconnectHandlerTests
     {
         private readonly Mock<IUserConnectionRepository> _userConnectionRepositoryMock;
+        private readonly Mock<IEventBusManager> _eventBusManagerMock;
         private readonly OnDisconnectHandler _handler;
 
         public OnDisconnectHandlerTests()
         {
             _userConnectionRepositoryMock = new Mock<IUserConnectionRepository>();
-            _handler = new OnDisconnectHandler(_userConnectionRepositoryMock.Object);
+            _eventBusManagerMock = new Mock<IEventBusManager>();
+            _handler = new OnDisconnectHandler(_userConnectionRepositoryMock.Object, _eventBusManagerMock.Object);
         }
 
         [Fact]
@@ -30,7 +33,7 @@ namespace Adapter.Tests.Handler
             {
                 RequestContext = new APIGatewayProxyRequest.ProxyRequestContext
                 {
-                    Authorizer = new APIGatewayCustomAuthorizerContext{{"userId", userId}},
+                    Authorizer = new APIGatewayCustomAuthorizerContext {{"userId", userId}},
                     ConnectionId = connectionId
                 }
             };
@@ -55,6 +58,7 @@ namespace Adapter.Tests.Handler
             };
 
             _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId, CancellationToken.None)).ReturnsAsync(userConnection);
+            _eventBusManagerMock.Setup(service => service.OnlineStatusChanged(userId, false, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
             // Act
             var response = await _handler.Handler(request, context.Object);
@@ -63,6 +67,7 @@ namespace Adapter.Tests.Handler
             _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(userId, CancellationToken.None), Times.Never);
             _userConnectionRepositoryMock.Verify(repo => repo.SaveLastActivityAsync(userId, CancellationToken.None), Times.Never);
             _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(userConnection, CancellationToken.None), Times.Once);
+            _eventBusManagerMock.Verify(service => service.OnlineStatusChanged(userId, false, It.IsAny<CancellationToken>()), Times.Once);
 
             Assert.Equal("Disconnected", response.Body);
             Assert.Equal((int) HttpStatusCode.OK, response.StatusCode);
@@ -80,7 +85,7 @@ namespace Adapter.Tests.Handler
             {
                 RequestContext = new APIGatewayProxyRequest.ProxyRequestContext
                 {
-                    Authorizer = new APIGatewayCustomAuthorizerContext{{"userId", userId}},
+                    Authorizer = new APIGatewayCustomAuthorizerContext {{"userId", userId}},
                     ConnectionId = connectionId
                 }
             };
@@ -100,7 +105,7 @@ namespace Adapter.Tests.Handler
             };
 
             _userConnectionRepositoryMock.Setup(repo => repo.GetAsync(userId, CancellationToken.None)).ReturnsAsync(userConnection);
-
+            _eventBusManagerMock.Setup(service => service.OnlineStatusChanged(userId, false, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             // Act
             var response = await _handler.Handler(request, context.Object);
 
@@ -108,6 +113,7 @@ namespace Adapter.Tests.Handler
             _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(userId, CancellationToken.None), Times.Once);
             _userConnectionRepositoryMock.Verify(repo => repo.SaveLastActivityAsync(userId, CancellationToken.None), Times.Once);
             _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(), CancellationToken.None), Times.Never);
+            _eventBusManagerMock.Verify(service => service.OnlineStatusChanged(userId, false, It.IsAny<CancellationToken>()), Times.Once);
 
             Assert.Equal("Disconnected", response.Body);
             Assert.Equal((int) HttpStatusCode.OK, response.StatusCode);
@@ -128,13 +134,12 @@ namespace Adapter.Tests.Handler
             _userConnectionRepositoryMock.Verify(repo => repo.DeleteAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
             _userConnectionRepositoryMock.Verify(repo => repo.SaveLastActivityAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
             _userConnectionRepositoryMock.Verify(repo => repo.SaveAsync(It.IsAny<UserConnection>(), CancellationToken.None), Times.Never);
-
+            _eventBusManagerMock.Verify(service => service.OnlineStatusChanged(It.IsAny<string>(), false, It.IsAny<CancellationToken>()), Times.Never);
             Assert.Equal("invalid authorization", response.Body);
             Assert.Equal((int) HttpStatusCode.BadRequest, response.StatusCode);
         }
 
-        
-        
+
         [Fact]
         public async Task Handler_ThereIsNoConnectionForUser_ReturnOkResponse()
         {
@@ -151,7 +156,7 @@ namespace Adapter.Tests.Handler
             };
             var context = new Mock<ILambdaContext>();
 
-            _userConnectionRepositoryMock.Setup(q=> q.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((UserConnection)null);
+            _userConnectionRepositoryMock.Setup(q => q.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((UserConnection) null);
             // Act
             var response = await _handler.Handler(request, context.Object);
 
