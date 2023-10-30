@@ -51,8 +51,7 @@ public class SendMessageHandler
                 continue;
             }
 
-            var userConnectionModified = false;
-
+            List<string> oldConnections = new();
             var stream = new MemoryStream(Encoding.UTF8.GetBytes(messageDomain.Body));
             foreach (var connection in userConnection.Connections)
             {
@@ -62,18 +61,21 @@ public class SendMessageHandler
                     continue;
                 }
 
-                userConnection.Connections.RemoveAll(q => q.Id == connection.Id);
-                userConnectionModified = true;
+                oldConnections.Add(connection.Id);
             }
 
             if (!userConnection.Connections.Any())
             {
                 await _userConnectionRepository.DeleteAsync(messageDomain.UserId);
             }
-            else if (userConnectionModified)
+
+            if (!oldConnections.Any())
             {
-                await _userConnectionRepository.SaveAsync(userConnection);
-            }
+                continue;
+            } 
+                
+            userConnection.Connections.RemoveAll(q => oldConnections.Contains(q.Id));
+            await _userConnectionRepository.SaveAsync(userConnection);
         }
 
 
