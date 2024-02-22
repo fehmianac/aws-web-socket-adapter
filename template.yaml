@@ -134,7 +134,7 @@ Resources:
       Role: !GetAtt OnConnectFunctionLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 180
-      Runtime: dotnet6
+      Runtime: dotnet8
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
@@ -211,7 +211,7 @@ Resources:
       Role: !GetAtt OnDisconnectFunctionLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 180
-      Runtime: dotnet6
+      Runtime: dotnet8
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
@@ -303,7 +303,7 @@ Resources:
       Role: !GetAtt AuthorizerFunctionLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 180
-      Runtime: dotnet6
+      Runtime: dotnet8
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
@@ -352,7 +352,7 @@ Resources:
       Role: !GetAtt SendMessageLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 120
-      Runtime: dotnet6
+      Runtime: dotnet8
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
@@ -481,7 +481,7 @@ Resources:
       Role: !GetAtt OnlineListFunctionLambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 180
-      Runtime: dotnet6
+      Runtime: dotnet8
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
