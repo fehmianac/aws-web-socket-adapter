@@ -156,6 +156,7 @@ public class UserConnectionRepository : IUserConnectionRepository
                 {"pk", new AttributeValue {S = LastActivityPk}},
                 {"sk", new AttributeValue {S = userId}},
                 {"time", new AttributeValue {S = DateTime.UtcNow.ToString("O")}},
+                {"ttl", new AttributeValue {N = DateTimeOffset.UtcNow.AddMonths(6).ToUnixTimeSeconds().ToString()}}
             }
         };
 
