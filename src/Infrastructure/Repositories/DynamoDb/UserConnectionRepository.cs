@@ -87,7 +87,7 @@ public class UserConnectionRepository : IUserConnectionRepository
                         }).ToList()
                     }
                 },
-                {"ttl",new AttributeValue {N = ttl.ToUnixTimeSeconds().ToString()}}
+                {"ttl",new AttributeValue {N = ttl.AddMinutes(30).ToUnixTimeSeconds().ToString()}}
             }
         };
 
