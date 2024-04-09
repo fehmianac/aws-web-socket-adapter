@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Domain.Entities;
+using Domain.Extensions;
 using Domain.Repositories;
 
 namespace Infrastructure.Repositories.DynamoDb;
@@ -62,6 +63,10 @@ public class UserConnectionRepository : IUserConnectionRepository
 
     public async Task<bool> SaveAsync(UserConnection userConnection, CancellationToken cancellationToken = default)
     {
+        var ttl = DateTime.UtcNow;
+        if(userConnection.Connections.Any())
+            ttl = userConnection.Connections.Max(q => q.Time);
+        
         var request = new PutItemRequest
         {
             TableName = _tableName,
@@ -82,6 +87,7 @@ public class UserConnectionRepository : IUserConnectionRepository
                         }).ToList()
                     }
                 },
+                {"ttl",new AttributeValue {N = ttl.ToUnixTimeSeconds().ToString()}}
             }
         };
 
