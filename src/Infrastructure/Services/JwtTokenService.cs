@@ -27,7 +27,7 @@ public class JwtTokenService : ITokenService
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtSecret)),
             ValidateIssuer = false,
             ValidateAudience = false,
-            ValidateLifetime = true
+            ValidateLifetime = false
         };
         var tokenValidationResult = await tokenHandler.ValidateTokenAsync(token, validationParameters);
         if (!tokenValidationResult.IsValid)
