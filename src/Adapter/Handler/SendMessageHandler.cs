@@ -45,7 +45,7 @@ public class SendMessageHandler
                 continue;
             }
 
-            Console.WriteLine(messageDomain);
+            Console.WriteLine(JsonSerializer.Serialize(messageDomain));
             var userConnection = await _userConnectionRepository.GetAsync(messageDomain.UserId);
             if (userConnection == null || !userConnection.Connections.Any())
             {
