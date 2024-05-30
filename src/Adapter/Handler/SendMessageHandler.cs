@@ -45,6 +45,7 @@ public class SendMessageHandler
                 continue;
             }
 
+            Console.WriteLine(messageDomain);
             var userConnection = await _userConnectionRepository.GetAsync(messageDomain.UserId);
             if (userConnection == null || !userConnection.Connections.Any())
             {
@@ -77,8 +78,6 @@ public class SendMessageHandler
             userConnection.Connections.RemoveAll(q => oldConnections.Contains(q.Id));
             await _userConnectionRepository.SaveAsync(userConnection);
         }
-
-
         return response;
     }
 
