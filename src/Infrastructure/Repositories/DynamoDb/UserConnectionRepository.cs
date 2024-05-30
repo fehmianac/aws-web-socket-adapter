@@ -32,8 +32,8 @@ public class UserConnectionRepository : IUserConnectionRepository
             KeyConditionExpression = "pk = :pk and sk = :sk",
             ExpressionAttributeValues = new Dictionary<string, AttributeValue>
             {
-                {":pk", new AttributeValue {S = UserConnectionPk}},
-                {":sk", new AttributeValue {S = userId}}
+                { ":pk", new AttributeValue { S = UserConnectionPk } },
+                { ":sk", new AttributeValue { S = userId } }
             },
         };
 
@@ -64,32 +64,34 @@ public class UserConnectionRepository : IUserConnectionRepository
     public async Task<bool> SaveAsync(UserConnection userConnection, CancellationToken cancellationToken = default)
     {
         var ttl = DateTime.UtcNow;
-        if(userConnection.Connections.Any())
+        if (userConnection.Connections.Any())
             ttl = userConnection.Connections.Max(q => q.Time);
-        
+
         var request = new PutItemRequest
         {
             TableName = _tableName,
             Item = new Dictionary<string, AttributeValue>
             {
-                {"pk", new AttributeValue {S = UserConnectionPk}},
-                {"sk", new AttributeValue {S = userConnection.UserId}},
-                {
-                    "connections", new AttributeValue
-                    {
-                        L = userConnection.Connections.Select(q => new AttributeValue
-                        {
-                            M = new Dictionary<string, AttributeValue>
-                            {
-                                {"id", new AttributeValue {S = q.Id}},
-                                {"time", new AttributeValue {S = q.Time.ToString("O")}}
-                            }
-                        }).ToList()
-                    }
-                },
-                {"ttl",new AttributeValue {N = ttl.AddMinutes(30).ToUnixTimeSeconds().ToString()}}
+                { "pk", new AttributeValue { S = UserConnectionPk } },
+                { "sk", new AttributeValue { S = userConnection.UserId } },
+                { "ttl", new AttributeValue { N = ttl.AddMinutes(30).ToUnixTimeSeconds().ToString() } }
             }
         };
+
+        if (userConnection.Connections.Any())
+        {
+            request.Item.Add("connections", new AttributeValue
+            {
+                L = userConnection.Connections.Select(q => new AttributeValue
+                {
+                    M = new Dictionary<string, AttributeValue>
+                    {
+                        { "id", new AttributeValue { S = q.Id } },
+                        { "time", new AttributeValue { S = q.Time.ToString("O") } }
+                    }
+                }).ToList()
+            });
+        }
 
         var response = await _amazonDynamoDb.PutItemAsync(request, cancellationToken);
         return response.HttpStatusCode == HttpStatusCode.OK;
@@ -102,15 +104,16 @@ public class UserConnectionRepository : IUserConnectionRepository
             TableName = _tableName,
             Key = new Dictionary<string, AttributeValue>
             {
-                {"pk", new AttributeValue {S = UserConnectionPk}},
-                {"sk", new AttributeValue {S = userId}}
+                { "pk", new AttributeValue { S = UserConnectionPk } },
+                { "sk", new AttributeValue { S = userId } }
             }
         };
         var response = await _amazonDynamoDb.DeleteItemAsync(request, cancellationToken);
         return response.HttpStatusCode == HttpStatusCode.OK;
     }
 
-    public async Task<List<string>> GetOnlineListAsync(List<string> userIds, CancellationToken cancellationToken = default)
+    public async Task<List<string>> GetOnlineListAsync(List<string> userIds,
+        CancellationToken cancellationToken = default)
     {
         if (!userIds.Any())
         {
@@ -126,8 +129,8 @@ public class UserConnectionRepository : IUserConnectionRepository
                     {
                         Keys = userIds.Select(q => new Dictionary<string, AttributeValue>
                         {
-                            {"pk", new AttributeValue {S = UserConnectionPk}},
-                            {"sk", new AttributeValue {S = q}}
+                            { "pk", new AttributeValue { S = UserConnectionPk } },
+                            { "sk", new AttributeValue { S = q } }
                         }).ToList(),
                         ProjectionExpression = "sk"
                     }
@@ -146,7 +149,7 @@ public class UserConnectionRepository : IUserConnectionRepository
             KeyConditionExpression = "pk = :pk",
             ExpressionAttributeValues = new Dictionary<string, AttributeValue>
             {
-                {":pk", new AttributeValue {S = UserConnectionPk}}
+                { ":pk", new AttributeValue { S = UserConnectionPk } }
             },
         }, cancellationToken);
         return queryResponse.Items.Select(q => q["sk"].S).ToList();
@@ -159,10 +162,10 @@ public class UserConnectionRepository : IUserConnectionRepository
             TableName = _tableName,
             Item = new Dictionary<string, AttributeValue>
             {
-                {"pk", new AttributeValue {S = LastActivityPk}},
-                {"sk", new AttributeValue {S = userId}},
-                {"time", new AttributeValue {S = DateTime.UtcNow.ToString("O")}},
-                {"ttl", new AttributeValue {N = DateTimeOffset.UtcNow.AddMonths(6).ToUnixTimeSeconds().ToString()}}
+                { "pk", new AttributeValue { S = LastActivityPk } },
+                { "sk", new AttributeValue { S = userId } },
+                { "time", new AttributeValue { S = DateTime.UtcNow.ToString("O") } },
+                { "ttl", new AttributeValue { N = DateTimeOffset.UtcNow.AddMonths(6).ToUnixTimeSeconds().ToString() } }
             }
         };
 
@@ -171,7 +174,8 @@ public class UserConnectionRepository : IUserConnectionRepository
         return response.HttpStatusCode == HttpStatusCode.OK;
     }
 
-    public async Task<List<UserLastActivity>> GetLastActivityAsync(List<string> userIds, CancellationToken cancellationToken = default)
+    public async Task<List<UserLastActivity>> GetLastActivityAsync(List<string> userIds,
+        CancellationToken cancellationToken = default)
     {
         if (!userIds.Any())
             return new List<UserLastActivity>();
@@ -185,8 +189,8 @@ public class UserConnectionRepository : IUserConnectionRepository
                     {
                         Keys = userIds.Select(q => new Dictionary<string, AttributeValue>
                         {
-                            {"pk", new AttributeValue {S = LastActivityPk}},
-                            {"sk", new AttributeValue {S = q}}
+                            { "pk", new AttributeValue { S = LastActivityPk } },
+                            { "sk", new AttributeValue { S = q } }
                         }).ToList()
                     }
                 }
