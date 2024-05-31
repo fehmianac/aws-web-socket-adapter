@@ -27,7 +27,8 @@ public class SendMessageHandler
         _userConnectionRepository = RepositoryFactory.CreateUserConnectionRepository();
     }
 
-    public SendMessageHandler(IAmazonApiGatewayManagementApi amazonApiGatewayManagementApi, IUserConnectionRepository userConnectionRepository)
+    public SendMessageHandler(IAmazonApiGatewayManagementApi amazonApiGatewayManagementApi,
+        IUserConnectionRepository userConnectionRepository)
     {
         _amazonApiGatewayManagementApi = amazonApiGatewayManagementApi;
         _userConnectionRepository = userConnectionRepository;
@@ -65,19 +66,23 @@ public class SendMessageHandler
                 oldConnections.Add(connection.Id);
             }
 
-            if (!userConnection.Connections.Any())
+            if (userConnection.Connections.Count == 0)
             {
                 await _userConnectionRepository.DeleteAsync(messageDomain.UserId);
             }
 
-            if (!oldConnections.Any())
+            if (oldConnections.Count == 0)
             {
                 continue;
-            } 
-                
+            }
+
             userConnection.Connections.RemoveAll(q => oldConnections.Contains(q.Id));
-            await _userConnectionRepository.SaveAsync(userConnection);
+            if (userConnection.Connections.Count != 0)
+                await _userConnectionRepository.SaveAsync(userConnection);
+            else
+                await _userConnectionRepository.DeleteAsync(messageDomain.UserId);
         }
+
         return response;
     }
 
